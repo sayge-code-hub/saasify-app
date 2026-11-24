@@ -80,7 +80,7 @@ Anonymous (`anon`) has no privilege and appears in no policy on any table in
 | Employees | own row only | full |
 | Users | own row only | full |
 | Documents | own employee documents | full |
-| Employee purchase orders | read own | full |
+| Employee purchase orders | no access | full |
 | Expenses | own rows | full, incl. approval |
 | Payslips | read own | full |
 | Activity log | no access | read-only |

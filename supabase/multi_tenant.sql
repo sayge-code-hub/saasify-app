@@ -1955,6 +1955,22 @@ begin
   end loop;
 end $$;
 
+-- Purchase orders are internal records: override the generic tenant-read
+-- policy above so only staff of the same company can read them.
+do $$
+begin
+  if to_regclass('public.employee_purchase_orders') is null then
+    return;
+  end if;
+  drop policy if exists employee_purchase_orders_select_tenant on public.employee_purchase_orders;
+  create policy employee_purchase_orders_select_tenant
+    on public.employee_purchase_orders for select to authenticated
+    using (
+      public.app_is_staff()
+      and public.app_same_company(coalesce(company_id, public.app_company_id()))
+    );
+end $$;
+
 -- Replace users / employees rbac with tenant-aware versions (idempotent names)
 drop policy if exists "users_select_rbac" on public.users;
 drop policy if exists "users_insert_rbac" on public.users;
