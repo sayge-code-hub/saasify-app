@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/auth/app_access.dart';
 import '../../../../core/auth/auth_session.dart';
@@ -11,6 +14,7 @@ import '../../../../core/router/app_routes.dart';
 import '../../../../core/widgets/app_version_label.dart';
 import '../../../../core/widgets/auth_page_scaffold.dart';
 import '../../../../injection_container.dart';
+import '../../data/datasources/auth_remote_datasource.dart';
 import '../bloc/login_bloc.dart';
 import '../widgets/login_form.dart';
 
@@ -26,8 +30,71 @@ class LoginPage extends StatelessWidget {
   }
 }
 
-class LoginView extends StatelessWidget {
+class LoginView extends StatefulWidget {
   const LoginView({super.key});
+
+  @override
+  State<LoginView> createState() => _LoginViewState();
+}
+
+class _LoginViewState extends State<LoginView> {
+  StreamSubscription<AuthState>? _authSubscription;
+  bool _handlingGoogleSignIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
+      if (data.event == AuthChangeEvent.signedIn) {
+        _completeGoogleSignIn();
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _completeGoogleSignIn(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _completeGoogleSignIn() async {
+    if (_handlingGoogleSignIn || !mounted) return;
+    final user = Supabase.instance.client.auth.currentUser;
+    final signedInWithGoogle =
+        user?.appMetadata['provider']?.toString() == 'google' ||
+        (user?.identities?.any((identity) => identity.provider == 'google') ??
+            false);
+    if (!signedInWithGoogle) return;
+
+    _handlingGoogleSignIn = true;
+    try {
+      final profile = await sl<AuthRemoteDataSource>().restoreSession();
+      if (profile == null) {
+        await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This Google account is not authorized for Saasify. Ask your administrator for an invite.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+      await sl<AuthSession>().setUser(profile, needsPasswordSetup: false);
+      await sl<BillingAccess>().refresh();
+      if (mounted) context.go(AppAccess.homeRoute(profile));
+    } finally {
+      _handlingGoogleSignIn = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
