@@ -40,6 +40,14 @@ abstract final class AppConfig {
     return '$base/set-password';
   }
 
+  /// Return OAuth users to sign-in, where the restored session is validated
+  /// against an active app profile before entering the product.
+  static String get oauthRedirectUrl {
+    final base = appPublicUrl;
+    if (base.isEmpty) return '';
+    return '$base/login';
+  }
+
   static bool get hasSupabase =>
       supabaseUrl.isNotEmpty &&
       supabaseAnonKey.isNotEmpty &&

@@ -13,6 +13,7 @@ import '../../../../core/widgets/app_message_dialog.dart';
 import '../../../../core/widgets/app_password_field.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../injection_container.dart';
+import '../../data/datasources/auth_remote_datasource.dart';
 import '../../domain/usecases/reset_password_usecase.dart';
 import '../bloc/login_bloc.dart';
 
@@ -29,6 +30,7 @@ class _LoginFormState extends State<LoginForm> {
   final _passwordFocusNode = FocusNode();
   late final TapGestureRecognizer _emailTapRecognizer;
   bool _resetting = false;
+  bool _startingGoogleSignIn = false;
 
   static final _supportEmailUri = Uri(
     scheme: 'mailto',
@@ -98,17 +100,38 @@ class _LoginFormState extends State<LoginForm> {
     );
   }
 
+  Future<void> _signInWithGoogle() async {
+    if (_startingGoogleSignIn) return;
+    setState(() => _startingGoogleSignIn = true);
+    try {
+      await sl<AuthRemoteDataSource>().signInWithGoogle();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _startingGoogleSignIn = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bodyStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontSize: 13,
-          height: 1.45,
-          color: AppColors.textLight,
-        );
+      fontSize: 13,
+      height: 1.45,
+      color: AppColors.textLight,
+    );
 
     return BlocBuilder<LoginBloc, LoginState>(
       builder: (context, state) {
-        final isLoading = state.status == LoginStatus.loading || _resetting;
+        final isLoading =
+            state.status == LoginStatus.loading ||
+            _resetting ||
+            _startingGoogleSignIn;
 
         return AutofillGroup(
           child: Column(
@@ -158,10 +181,10 @@ class _LoginFormState extends State<LoginForm> {
                   child: Text(
                     _resetting ? 'Sending…' : 'Forgot password?',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          decoration: TextDecoration.underline,
-                        ),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
               ),
@@ -176,12 +199,46 @@ class _LoginFormState extends State<LoginForm> {
                 onPressed: isLoading
                     ? null
                     : () =>
-                        context.read<LoginBloc>().add(const LoginSubmitted()),
+                          context.read<LoginBloc>().add(const LoginSubmitted()),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: isLoading ? null : _signInWithGoogle,
+                  icon: _startingGoogleSignIn
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'G',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                  label: Text(
+                    _startingGoogleSignIn
+                        ? 'Opening Google…'
+                        : 'Continue with Google',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.text,
+                    side: const BorderSide(color: AppColors.border),
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               TextButton(
-                onPressed:
-                    isLoading ? null : () => context.go(AppRoutes.signup),
+                onPressed: isLoading
+                    ? null
+                    : () => context.go(AppRoutes.signup),
                 child: const Text('New to Saasify? Create account'),
               ),
               const SizedBox(height: 8),
@@ -243,10 +300,10 @@ class _ErrorBanner extends StatelessWidget {
             child: Text(
               message,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.error,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                color: AppColors.error,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],

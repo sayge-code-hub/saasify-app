@@ -7,13 +7,13 @@ import '../../../../core/storage/app_storage_urls.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
-  Future<UserModel> login({
-    required String email,
-    required String password,
-  });
+  Future<UserModel> login({required String email, required String password});
 
   /// Sends a password-recovery email; [SetPasswordPage] handles the link.
   Future<void> resetPasswordForEmail(String email);
+
+  /// Starts Google OAuth. Completion is observed through Supabase auth state.
+  Future<void> signInWithGoogle();
 
   /// Returns the profile for the current Supabase session, if any.
   Future<UserModel?> restoreSession();
@@ -33,7 +33,7 @@ abstract class AuthRemoteDataSource {
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
 
@@ -72,7 +72,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> resetPasswordForEmail(String email) async {
     final trimmed = email.trim().toLowerCase();
     if (trimmed.isEmpty) {
-      throw const core.AuthException('Enter your email to reset your password.');
+      throw const core.AuthException(
+        'Enter your email to reset your password.',
+      );
     }
     try {
       final redirect = AppConfig.inviteRedirectUrl;
@@ -85,6 +87,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (_) {
       throw const core.AuthException(
         'Unable to send reset email. Try again later.',
+      );
+    }
+  }
+
+  @override
+  Future<void> signInWithGoogle() async {
+    try {
+      final redirect = AppConfig.oauthRedirectUrl;
+      final launched = await _client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: redirect.isEmpty ? null : redirect,
+      );
+      if (!launched) {
+        throw const core.AuthException(
+          'Could not open Google sign-in. Please allow pop-ups and try again.',
+        );
+      }
+    } on core.AuthException {
+      rethrow;
+    } on AuthException catch (e) {
+      throw core.AuthException(e.message);
+    } catch (_) {
+      throw const core.NetworkException(
+        'Unable to start Google sign-in. Try again later.',
       );
     }
   }
@@ -149,7 +175,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         : 'jpg';
     final path =
         '${authUser.id}/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
-    final contentType = mimeType.trim().isEmpty ? 'image/jpeg' : mimeType.trim();
+    final contentType = mimeType.trim().isEmpty
+        ? 'image/jpeg'
+        : mimeType.trim();
 
     try {
       final existing = await _client
@@ -159,15 +187,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           .maybeSingle();
       final previous = (existing?['avatar_path'] ?? '').toString().trim();
 
-      await _client.storage.from(_bucket).uploadBinary(
+      await _client.storage
+          .from(_bucket)
+          .uploadBinary(
             path,
             bytes,
-            fileOptions: FileOptions(
-              contentType: contentType,
-              upsert: true,
-            ),
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
           );
-      await _client.from('users').update({'avatar_path': path}).eq('id', authUser.id);
+      await _client
+          .from('users')
+          .update({'avatar_path': path})
+          .eq('id', authUser.id);
 
       if (previous.isNotEmpty && previous != path) {
         try {
@@ -237,9 +267,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     }
 
-    return UserModel.fromProfileRow(
-      profile,
-      avatarUrl: avatarUrl,
-    );
+    return UserModel.fromProfileRow(profile, avatarUrl: avatarUrl);
   }
 }

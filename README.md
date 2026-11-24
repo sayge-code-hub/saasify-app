@@ -66,6 +66,25 @@ lib/
    verification script against the target project. Do not expose privileged
    database RPCs to browser clients.
 
+### Google sign-in
+
+The login screen supports Google OAuth for **existing, authorized users**.
+It deliberately does not provision a new employee profile from a Google
+address: employees remain owner/admin-invited, while new workspaces use the
+existing Free-plan sign-up flow.
+
+To enable it in production, create a Google OAuth web client and configure its
+authorized redirect URI as:
+
+```text
+https://grtkunxakranseakxofl.supabase.co/auth/v1/callback
+```
+
+Then in Supabase Dashboard → Authentication → Providers → Google, enable the
+provider and enter that client ID and secret. In Authentication → URL
+Configuration, add `https://app.sayge.in/login` to Redirect URLs. Never put the
+Google client secret in the Flutter app or repository.
+
 Any email domain can create a workspace or be invited by an owner/admin.
 
 ## Database access model
