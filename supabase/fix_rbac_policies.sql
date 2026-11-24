@@ -222,7 +222,7 @@ begin
     using (public.app_is_staff());
 end $$;
 
--- Purchase orders: staff full access; employees can read their own POs.
+-- Purchase orders: staff-only.
 do $$
 begin
   if to_regclass('public.employee_purchase_orders') is null then
@@ -243,7 +243,6 @@ begin
     to authenticated
     using (
       public.app_is_staff()
-      or employee_id = public.app_employee_id()
     );
 
   create policy "employee_purchase_orders_insert_rbac"

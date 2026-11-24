@@ -571,7 +571,8 @@ begin
   grant select, insert, update, delete on public.documents to authenticated;
 end $$;
 
--- 4f. Employee purchase orders: staff write; employees read their own.
+-- 4f. Employee purchase orders: staff-only. These are internal procurement
+--     records and are never exposed to employee accounts.
 do $$
 begin
   if to_regclass('public.employee_purchase_orders') is null then
@@ -581,7 +582,7 @@ begin
   create policy "employee_purchase_orders_select_rbac"
     on public.employee_purchase_orders for select
     to authenticated
-    using (public.app_is_staff() or employee_id = public.app_employee_id());
+    using (public.app_is_staff());
 
   create policy "employee_purchase_orders_insert_rbac"
     on public.employee_purchase_orders for insert
@@ -927,7 +928,7 @@ begin
     );
 end $$;
 
--- Purchase-order PDFs: private. Staff write; employees read only their own.
+-- Purchase-order PDFs: private and staff-only.
 do $$
 begin
   if to_regclass('public.employee_purchase_orders') is null then
@@ -938,14 +939,7 @@ begin
     on storage.objects for select to authenticated
     using (
       bucket_id = 'employee-pos'
-      and (
-        public.app_is_staff()
-        or exists (
-          select 1 from public.employee_purchase_orders po
-          where po.storage_path = storage.objects.name
-            and po.employee_id = public.app_employee_id()
-        )
-      )
+      and public.app_is_staff()
     );
   create policy "employee_pos_storage_insert"
     on storage.objects for insert to authenticated

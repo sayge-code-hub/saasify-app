@@ -20,11 +20,13 @@ Always finish with `security_hardening.sql`, then run `security_verification.sql
 4. `billing_closed_beta.sql` — after hardening (needs `app_is_staff`); singleton Free/Starter/Growth + seat trigger. Does **not** revoke guest POS grants.
 5. `multi_tenant.sql` — after billing; adds company-scoped data/RLS and
    self-serve workspace creation.
-6. `production_security_hardening.sql` — mandatory production hardening. It
+6. `employee_purchase_orders_staff_only.sql` — makes purchase orders and their
+   PDFs staff-only. It is non-destructive and may be re-run.
+7. `production_security_hardening.sql` — mandatory production hardening. It
    retires the legacy password-based platform-ops RPCs and verifies they cannot
    be called by anonymous or signed-in application users.
-7. `security_verification.sql` — checks 1–3, 7–9, 14 must be empty
-8. Deploy edge function: `supabase functions deploy invite-employee --no-verify-jwt`
+8. `security_verification.sql` — checks 1–3, 7–9, 14 must be empty
+9. Deploy edge function: `supabase functions deploy invite-employee --no-verify-jwt`
 
 ## Existing production (incremental)
 
@@ -44,6 +46,7 @@ cafe_pos.sql
 security_hardening.sql
 billing_closed_beta.sql
 multi_tenant.sql
+employee_purchase_orders_staff_only.sql
 production_security_hardening.sql
 security_verification.sql
 ```

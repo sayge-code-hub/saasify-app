@@ -292,7 +292,7 @@ GoRouter createAppRouter(AuthSession authSession) {
                     employee: employee,
                     embedded: true,
                     canEdit: staff,
-                    showPurchaseOrders: true,
+                    showPurchaseOrders: staff,
                     canManagePurchaseOrders: staff,
                     showDocuments: true,
                     onBack: staff
