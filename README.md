@@ -138,8 +138,9 @@ your local `.env`.
 ## CI gates
 
 GitHub Actions runs **analyze + tests** on every pull request and push to `main`
-(`.github/workflows/ci.yml`). Production Netlify deploys also run the same
-checks **before** version bump / build (`.github/workflows/deploy-netlify.yml`).
+(`.github/workflows/ci.yml`). Production deployment is handled only by
+`.github/workflows/deploy-hostinger.yml`, which runs the same checks before
+building and publishing `https://app.sayge.in`.
 
 To block merging a red PR: GitHub → **Settings → Branches → Add rule** for
 `main` → require status check **Analyze & test**.
