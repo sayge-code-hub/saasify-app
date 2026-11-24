@@ -94,7 +94,7 @@ where bucket_id in (
 order by bucket_id, name;
 
 -- 9. No function in `public` may be executable by anon or PUBLIC —
---    except intentional guest Cafe POS + password-gated platform_ops RPCs.
+--    except intentional guest Cafe POS RPCs.
 --    PostgreSQL grants EXECUTE to PUBLIC on every new function, and anon
 --    inherits it, so this must cover the whole schema — not just the role
 --    helpers. Extension-owned functions are excluded; their ACLs are the
@@ -111,14 +111,7 @@ where n.nspname = 'public'
   and (acl.grantee = 0 or pg_get_userbyid(acl.grantee) = 'anon')
   and p.proname not in (
     'get_guest_cafe_menu',
-    'create_guest_cafe_order',
-    'platform_ops_snapshot',
-    'platform_ops_update_plan',
-    'platform_ops_set_live_plan',
-    'platform_ops_set_plan_active',
-    'platform_ops_create_company',
-    'platform_ops_set_company_plan',
-    'platform_ops_prepare_owner_invite'
+    'create_guest_cafe_order'
   )
   and not exists (
     select 1 from pg_depend d

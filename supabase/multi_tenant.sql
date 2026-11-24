@@ -1267,7 +1267,7 @@ declare
   v_sayge_status text := null;
   v_pos_enabled boolean := null;
 begin
-  if coalesce(p_password, '') is distinct from 'ihateluvstories' then
+  if coalesce(p_password, '') is distinct from 'LEGACY_PLATFORM_OPS_DISABLED' then
     raise exception 'PLATFORM_OPS_FORBIDDEN' using errcode = '42501';
   end if;
 
@@ -1424,7 +1424,7 @@ declare
   v_base text;
   v_i int := 0;
 begin
-  if coalesce(p_password, '') is distinct from 'ihateluvstories' then
+  if coalesce(p_password, '') is distinct from 'LEGACY_PLATFORM_OPS_DISABLED' then
     raise exception 'PLATFORM_OPS_FORBIDDEN' using errcode = '42501';
   end if;
   if nullif(trim(p_display_name), '') is null then
@@ -1509,7 +1509,7 @@ as $$
 declare
   v_old text;
 begin
-  if coalesce(p_password, '') is distinct from 'ihateluvstories' then
+  if coalesce(p_password, '') is distinct from 'LEGACY_PLATFORM_OPS_DISABLED' then
     raise exception 'PLATFORM_OPS_FORBIDDEN' using errcode = '42501';
   end if;
   if not exists (select 1 from public.company_details where id = p_company_id) then
@@ -1602,7 +1602,7 @@ declare
   v_owner_role text;
   v_email text;
 begin
-  if coalesce(p_password, '') is distinct from 'ihateluvstories' then
+  if coalesce(p_password, '') is distinct from 'LEGACY_PLATFORM_OPS_DISABLED' then
     raise exception 'PLATFORM_OPS_FORBIDDEN' using errcode = '42501';
   end if;
   if not exists (select 1 from public.company_details where id = p_company_id) then
@@ -1673,7 +1673,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if coalesce(p_password, '') is distinct from 'ihateluvstories' then
+  if coalesce(p_password, '') is distinct from 'LEGACY_PLATFORM_OPS_DISABLED' then
     raise exception 'PLATFORM_OPS_FORBIDDEN' using errcode = '42501';
   end if;
   if to_regclass('public.billing_plans') is null then
@@ -2218,3 +2218,27 @@ create policy invoice_line_items_delete_tenant on public.invoice_line_items
 
 grant select, insert, update, delete on public.invoice_line_items to authenticated;
 -- EOF line items RLS
+
+-- Retire the legacy password-gated platform console. A password shipped to a
+-- browser or mobile app cannot authorize SECURITY DEFINER functions. Keep the
+-- historical function definitions only for safe upgrades of existing schemas,
+-- but never expose them to application roles.
+do $$
+declare
+  signature text;
+begin
+  foreach signature in array array[
+    'public.platform_ops_snapshot(text)',
+    'public.platform_ops_update_plan(text, text, text, numeric, integer)',
+    'public.platform_ops_set_plan_active(text, text, boolean)',
+    'public.platform_ops_set_live_plan(text, text)',
+    'public.platform_ops_create_company(text, text, text, text, text, text)',
+    'public.platform_ops_set_company_plan(text, text, text)',
+    'public.platform_ops_prepare_owner_invite(text, text, text, text)'
+  ] loop
+    if to_regprocedure(signature) is not null then
+      execute format('revoke all on function %s from public, anon, authenticated', signature);
+    end if;
+  end loop;
+end;
+$$;

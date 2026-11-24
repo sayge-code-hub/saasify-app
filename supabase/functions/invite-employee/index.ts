@@ -64,22 +64,18 @@ Deno.serve(async (req) => {
     const roleCode =
       (callerProfile.roles as { code?: string } | null)?.code ?? ''
     const callerCompanyId = String(callerProfile.company_id ?? '').trim()
-    // Platform ops may pass company_id when inviting a new company owner.
     const body = await req.json().catch(() => ({})) as Record<string, unknown>
-    const opsCompanyId = String(body.company_id ?? body.companyId ?? '').trim()
-    const isOpsOwnerInvite =
-      String(body.source ?? '').trim().toLowerCase() === 'platform_ops'
 
     if (
-      !isOpsOwnerInvite &&
       roleCode !== 'owner' &&
       roleCode !== 'admin'
     ) {
       return json({ error: 'Only owners and admins can invite employees' }, 403)
     }
 
-    const companyId =
-      opsCompanyId || callerCompanyId || 'company_sayge'
+    // An owner/admin may invite only into their own tenant.  Do not accept a
+    // caller-supplied company id: this edge function uses the service role.
+    const companyId = callerCompanyId || 'company_sayge'
     body.company_id = companyId
     body.companyId = companyId
 

@@ -38,7 +38,9 @@ lib/
    | 1 | `supabase/schema.sql` | Tables, triggers, storage buckets. Enables RLS but defines **no** policies, so a half-finished setup is deny-all rather than open. |
    | 2 | `supabase/security_hardening.sql` | Authoritative grants + RLS policies. Revokes every `anon` privilege, drops all existing policies, and recreates them for `authenticated` only. Requires `users.is_active` for role helpers. |
    | 3 | Feature packs (as needed) | `ops_completeness_pack.sql` (invoice payment + payroll + expense receipts), `expense_categories.sql`, `pos.sql` + `pos_product_commerce.sql`, then **re-run** `security_hardening.sql`. |
-   | 4 | `supabase/security_verification.sql` | Asserts anon is still locked down. |
+   | 4 | `supabase/billing_closed_beta.sql`, then `supabase/multi_tenant.sql` | Per-company billing and tenant isolation. |
+   | 5 | `supabase/production_security_hardening.sql` | Retires legacy browser-accessible privileged RPCs without touching data. |
+   | 6 | `supabase/security_verification.sql` | Asserts anon is still locked down. |
 
    Without `SUPABASE_DB_URL`/`psql`, paste the files into Supabase → SQL Editor
    in the same order. The script then verifies the result.
@@ -56,14 +58,15 @@ lib/
    `expense_categories.sql`, `lock_signup_provisioning.sql`) and finish with
    `security_verification.sql`. `security_hardening.sql` remains safe to re-run
    on its own.
-4. **Invite-only Auth:** Dashboard → Authentication → Providers → Email → turn
-   **off** “Allow new users to sign up”. Provision via Settings → Invite
-   employee (or `lock_signup_provisioning.sql` + invite edge function). Open
-   self-signup no longer creates a `public.users` profile.
-5. Bootstrap the first owner once (e.g. `aditya.rana@sayge.in` via Dashboard
-   invite or schema backfill) so invites can be sent.
+4. **Self-serve signup:** Saasify creates a Free tenant workspace through
+   `saasify_complete_signup`. Enable email signup only after the tenant and RLS
+   scripts above have been applied and verified. Employee invitations remain
+   owner/admin-only through the `invite-employee` edge function.
+5. Before public launch, run `production_security_hardening.sql` and the
+   verification script against the target project. Do not expose privileged
+   database RPCs to browser clients.
 
-Any email domain can sign in / be invited (invite-only signup still required).
+Any email domain can create a workspace or be invited by an owner/admin.
 
 ## Database access model
 
@@ -148,5 +151,12 @@ flutter pub get
 flutter run -d chrome          # web
 flutter run                    # mobile / desktop
 ```
+
+## Android release signing
+
+Production Android builds deliberately refuse to use the debug signing key.
+Copy `android/key.properties.example` to `android/key.properties`, provide an
+upload keystore through your secret manager/CI, and keep both the keystore and
+the real properties file out of Git.
 
 After login: **Modules → HRMS → Employees**, **DMS**, and **Settings → Manage clients**.

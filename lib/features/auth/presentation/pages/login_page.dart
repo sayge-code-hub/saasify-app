@@ -65,26 +65,8 @@ class LoginView extends StatelessWidget {
   }
 }
 
-class _LoginHeader extends StatefulWidget {
+class _LoginHeader extends StatelessWidget {
   const _LoginHeader();
-
-  @override
-  State<_LoginHeader> createState() => _LoginHeaderState();
-}
-
-class _LoginHeaderState extends State<_LoginHeader> {
-  DateTime? _lastTap;
-
-  void _onLogoTap() {
-    final now = DateTime.now();
-    final prev = _lastTap;
-    _lastTap = now;
-    if (prev != null &&
-        now.difference(prev) <= const Duration(milliseconds: 450)) {
-      _lastTap = null;
-      context.go(AppRoutes.platformOpsGate);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,27 +74,22 @@ class _LoginHeaderState extends State<_LoginHeader> {
 
     return Column(
       children: [
-        GestureDetector(
-          onTap: _onLogoTap,
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Image.asset(
-              'assets/images/saasify_logo.png',
-              height: compact ? 40 : 48,
-              fit: BoxFit.contain,
-              semanticLabel: 'Saasify',
-            ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Image.asset(
+            'assets/images/saasify_logo.png',
+            height: compact ? 40 : 48,
+            fit: BoxFit.contain,
+            semanticLabel: 'Saasify',
           ),
         ),
         SizedBox(height: compact ? 12 : 14),
         Text(
           'Welcome back. Sign in to continue.',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontSize: 14,
-                height: 1.35,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.35),
         ),
       ],
     );
