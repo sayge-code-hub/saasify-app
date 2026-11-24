@@ -1,0 +1,6 @@
+# Copy to android/key.properties. Keep the real file private and provide the
+# referenced keystore securely in CI; never commit either credential.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=upload
+storeFile=/absolute/path/to/upload-keystore.jks

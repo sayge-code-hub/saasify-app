@@ -18,9 +18,13 @@ Always finish with `security_hardening.sql`, then run `security_verification.sql
    - `cafe_pos.sql` (Cafe-scoped POS MVP — create cafes in POS, not Settings clients)
 3. `security_hardening.sql` (**last**)
 4. `billing_closed_beta.sql` — after hardening (needs `app_is_staff`); singleton Free/Starter/Growth + seat trigger. Does **not** revoke guest POS grants.
-5. `platform_ops_snapshot.sql` — secret platform overview RPC (logo double-tap console).
-6. `security_verification.sql` — checks 1–3, 7–9, 14 must be empty
-7. Deploy edge function: `supabase functions deploy invite-employee --no-verify-jwt`
+5. `multi_tenant.sql` — after billing; adds company-scoped data/RLS and
+   self-serve workspace creation.
+6. `production_security_hardening.sql` — mandatory production hardening. It
+   retires the legacy password-based platform-ops RPCs and verifies they cannot
+   be called by anonymous or signed-in application users.
+7. `security_verification.sql` — checks 1–3, 7–9, 14 must be empty
+8. Deploy edge function: `supabase functions deploy invite-employee --no-verify-jwt`
 
 ## Existing production (incremental)
 
@@ -39,13 +43,15 @@ cafe_pos_reset_to_cafes.sql   # only if you already applied the old client-scope
 cafe_pos.sql
 security_hardening.sql
 billing_closed_beta.sql
+multi_tenant.sql
+production_security_hardening.sql
 security_verification.sql
 ```
 
-After `lock_signup_provisioning.sql`: Dashboard → **Authentication → Providers → Email** → turn **off** “Allow new users to sign up”.
-
-If an older deploy still blocked non-`@sayge.in` invites, also run
-`allow_any_email_domain.sql` and redeploy `invite-employee`.
+For self-serve Saasify signup, configure the Email provider according to your
+confirmation/password policy only after this sequence completes successfully.
+Redeploy `invite-employee` after applying the database scripts so it enforces
+the current owner/admin and tenant checks.
 
 ### Cafe POS guest QR menu (branding)
 

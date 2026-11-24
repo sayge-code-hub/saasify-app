@@ -19,8 +19,7 @@ abstract final class AppRoutes {
   static const payroll = '/payroll';
   static const profitability = '/profitability';
 
-  static String profitabilityClient(String cafeId) =>
-      '/profitability/$cafeId';
+  static String profitabilityClient(String cafeId) => '/profitability/$cafeId';
 
   static String profitabilityProjections(String cafeId) =>
       '/profitability/$cafeId/projections';
@@ -44,10 +43,6 @@ abstract final class AppRoutes {
   /// Curated release notes (tap the version label).
   static const whatsNew = '/whats-new';
 
-  /// Secret platform owner console (double-tap logo on login).
-  static const platformOpsGate = '/platform';
-  static const platformOps = '/platform/overview';
-
   static const pos = '/pos';
 
   /// Public guest QR menu (no auth). Optional `?t=` table number.
@@ -62,8 +57,7 @@ abstract final class AppRoutes {
 
   static String clientDetail(String cafeId) => '/settings/clients/$cafeId';
 
-  static String clientEdit(String cafeId) =>
-      '/settings/clients/$cafeId/edit';
+  static String clientEdit(String cafeId) => '/settings/clients/$cafeId/edit';
 
   static String employeeDetail(String id) => '/hrms/employees/$id';
 
@@ -81,8 +75,7 @@ abstract final class AppRoutes {
   static String posMenuEdit(String cafeId, String itemId) =>
       '/pos/$cafeId/menu/$itemId/edit';
 
-  static String posCategories(String cafeId) =>
-      '/pos/$cafeId/menu/categories';
+  static String posCategories(String cafeId) => '/pos/$cafeId/menu/categories';
 
   static String posTerminal(String cafeId) => '/pos/$cafeId/terminal';
 
