@@ -66,16 +66,6 @@ class ExpensesBloc extends Bloc<ExpensesEvent, ExpensesState> {
   }
 
   void _onEditOpened(ExpenseEditOpened event, Emitter<ExpensesState> emit) {
-    if (event.expense.approvalStatus != ExpenseApprovalStatus.pending) {
-      emit(
-        state.copyWith(
-          status: ExpensesStatus.failure,
-          errorMessage: 'Only pending expenses can be edited.',
-        ),
-      );
-      emit(state.copyWith(status: ExpensesStatus.ready, clearError: true));
-      return;
-    }
     emit(
       state.copyWith(
         showingForm: true,
@@ -117,7 +107,10 @@ class ExpensesBloc extends Bloc<ExpensesEvent, ExpensesState> {
               category: event.expense.category,
               clientId: event.expense.clientId,
               clientName: event.expense.clientName,
-              approvalStatus: editing.approvalStatus,
+              // A staff change to an approved/paid/rejected expense must go
+              // through approval again. The database trigger enforces this as
+              // well so API callers cannot bypass the workflow.
+              approvalStatus: ExpenseApprovalStatus.pending,
               expenseDate: event.expense.expenseDate,
               receiptPath: editing.receiptPath,
               receiptName: editing.receiptName,
@@ -242,6 +235,8 @@ class ExpensesBloc extends Bloc<ExpensesEvent, ExpensesState> {
             expenses: next,
             successMessage: event.status == ExpenseApprovalStatus.approved
                 ? 'Expense approved'
+                : event.status == ExpenseApprovalStatus.paid
+                ? 'Expense marked as paid'
                 : 'Expense rejected',
             clearApprovingId: true,
           ),

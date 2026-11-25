@@ -30,8 +30,7 @@ class EmployeePurchaseOrdersSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) =>
-          sl<EmployeePoBloc>()..add(EmployeePoRequested(employeeId)),
+      create: (_) => sl<EmployeePoBloc>()..add(EmployeePoRequested(employeeId)),
       child: _EmployeePurchaseOrdersBody(
         employeeId: employeeId,
         isDesktop: isDesktop,
@@ -84,7 +83,8 @@ class _EmployeePurchaseOrdersBody extends StatelessWidget {
       },
       builder: (context, state) {
         final saving = state.status == EmployeePoStatus.saving;
-        final loading = state.status == EmployeePoStatus.loading ||
+        final loading =
+            state.status == EmployeePoStatus.loading ||
             state.status == EmployeePoStatus.initial;
 
         return Container(
@@ -104,10 +104,10 @@ class _EmployeePurchaseOrdersBody extends StatelessWidget {
                     child: Text(
                       'Purchase orders',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.highlight,
-                          ),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.highlight,
+                      ),
                     ),
                   ),
                   if (canManage)
@@ -133,9 +133,9 @@ class _EmployeePurchaseOrdersBody extends StatelessWidget {
                   canManage
                       ? 'No purchase orders yet. Add a PO number, dates, and PDF.'
                       : 'No purchase orders attached yet.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textLight,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppColors.textLight),
                 )
               else
                 Column(
@@ -216,6 +216,18 @@ class _PoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final dates =
         '${AppDates.compact.format(order.startDate)} - ${AppDates.compact.format(order.endDate)}';
+    final (validityColor, validityIcon, validityText) = switch ((
+      order.isExpired,
+      order.needsRenewal,
+    )) {
+      (true, _) => (AppColors.error, Icons.error_outline, 'Expired'),
+      (false, true) => (
+        Colors.orange.shade800,
+        Icons.schedule_outlined,
+        'Renew in ${order.daysUntilEnd} days',
+      ),
+      _ => (AppColors.success, Icons.verified_outlined, 'Active'),
+    };
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
@@ -232,26 +244,41 @@ class _PoRow extends StatelessWidget {
               children: [
                 Text(
                   order.poNumber,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontSize: 14,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(fontSize: 14),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   dates,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 12,
-                        color: AppColors.textLight,
+                    fontSize: 12,
+                    color: AppColors.textLight,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Icon(validityIcon, color: validityColor, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      validityText,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontSize: 11,
+                        color: validityColor,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                  ],
                 ),
                 if (order.fileName.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
                     order.fileName,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontSize: 11,
-                          color: AppColors.textLight,
-                        ),
+                      fontSize: 11,
+                      color: AppColors.textLight,
+                    ),
                   ),
                 ],
               ],
@@ -261,9 +288,9 @@ class _PoRow extends StatelessWidget {
             tooltip: 'Open PDF',
             onPressed: !order.hasFile || busy
                 ? null
-                : () => context
-                    .read<EmployeePoBloc>()
-                    .add(EmployeePoDownloadRequested(order)),
+                : () => context.read<EmployeePoBloc>().add(
+                    EmployeePoDownloadRequested(order),
+                  ),
             icon: const Icon(Icons.picture_as_pdf_outlined),
           ),
           if (canManage)
@@ -315,10 +342,7 @@ Future<void> _showEditPoDialog(
     builder: (dialogContext) {
       return BlocProvider.value(
         value: context.read<EmployeePoBloc>(),
-        child: _EditPoDialog(
-          order: order,
-          replacePdfOnly: replacePdfOnly,
-        ),
+        child: _EditPoDialog(order: order, replacePdfOnly: replacePdfOnly),
       );
     },
   );
@@ -327,18 +351,13 @@ Future<void> _showEditPoDialog(
     await showAppMessageDialog(
       context,
       title: 'Purchase order',
-      message: replacePdfOnly
-          ? 'PO PDF replaced.'
-          : 'Purchase order updated.',
+      message: replacePdfOnly ? 'PO PDF replaced.' : 'Purchase order updated.',
     );
   }
 }
 
 class _EditPoDialog extends StatefulWidget {
-  const _EditPoDialog({
-    required this.order,
-    required this.replacePdfOnly,
-  });
+  const _EditPoDialog({required this.order, required this.replacePdfOnly});
 
   final EmployeePurchaseOrder order;
   final bool replacePdfOnly;
@@ -437,8 +456,7 @@ class _EditPoDialogState extends State<_EditPoDialog> {
       );
       return;
     }
-    if (widget.replacePdfOnly &&
-        (_fileName == null || _fileBytes == null)) {
+    if (widget.replacePdfOnly && (_fileName == null || _fileBytes == null)) {
       showAppMessageDialog(
         context,
         title: 'Purchase order',
@@ -448,16 +466,16 @@ class _EditPoDialogState extends State<_EditPoDialog> {
     }
 
     context.read<EmployeePoBloc>().add(
-          EmployeePoUpdated(
-            id: widget.order.id,
-            poNumber: widget.replacePdfOnly ? widget.order.poNumber : poNumber,
-            startDate: _startDate,
-            endDate: _endDate,
-            fileName: _fileName,
-            fileBytes: _fileBytes,
-            mimeType: _mimeType,
-          ),
-        );
+      EmployeePoUpdated(
+        id: widget.order.id,
+        poNumber: widget.replacePdfOnly ? widget.order.poNumber : poNumber,
+        startDate: _startDate,
+        endDate: _endDate,
+        fileName: _fileName,
+        fileBytes: _fileBytes,
+        mimeType: _mimeType,
+      ),
+    );
   }
 
   @override
@@ -485,9 +503,9 @@ class _EditPoDialogState extends State<_EditPoDialog> {
           ),
           title: Text(
             widget.replacePdfOnly ? 'Replace PO PDF' : 'Edit purchase order',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           content: SizedBox(
             width: 420,
@@ -527,9 +545,9 @@ class _EditPoDialogState extends State<_EditPoDialog> {
                         ? 'Replacement PDF'
                         : 'Replace PDF (optional)',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontSize: 13,
-                          color: AppColors.textLight,
-                        ),
+                      fontSize: 13,
+                      color: AppColors.textLight,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -550,9 +568,9 @@ class _EditPoDialogState extends State<_EditPoDialog> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontSize: 12,
-                              color: AppColors.textLight,
-                            ),
+                          fontSize: 12,
+                          color: AppColors.textLight,
+                        ),
                       ),
                     ),
                   ],
@@ -687,16 +705,16 @@ class _AddPoDialogState extends State<_AddPoDialog> {
     }
 
     context.read<EmployeePoBloc>().add(
-          EmployeePoSubmitted(
-            employeeId: widget.employeeId,
-            poNumber: poNumber,
-            startDate: _startDate!,
-            endDate: _endDate!,
-            fileName: _fileName!,
-            fileBytes: _fileBytes!,
-            mimeType: _mimeType,
-          ),
-        );
+      EmployeePoSubmitted(
+        employeeId: widget.employeeId,
+        poNumber: poNumber,
+        startDate: _startDate!,
+        endDate: _endDate!,
+        fileName: _fileName!,
+        fileBytes: _fileBytes!,
+        mimeType: _mimeType,
+      ),
+    );
   }
 
   @override
@@ -722,9 +740,9 @@ class _AddPoDialogState extends State<_AddPoDialog> {
           ),
           title: Text(
             'Add purchase order',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           content: SizedBox(
             width: 420,
@@ -760,9 +778,9 @@ class _AddPoDialogState extends State<_AddPoDialog> {
                   child: Text(
                     'PO document (PDF)',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontSize: 13,
-                          color: AppColors.textLight,
-                        ),
+                      fontSize: 13,
+                      color: AppColors.textLight,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -780,9 +798,9 @@ class _AddPoDialogState extends State<_AddPoDialog> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontSize: 12,
-                              color: AppColors.textLight,
-                            ),
+                          fontSize: 12,
+                          color: AppColors.textLight,
+                        ),
                       ),
                     ),
                   ],

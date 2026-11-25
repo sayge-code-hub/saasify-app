@@ -82,6 +82,16 @@ class BillingRemoteDataSource {
     return BillingState.fromJson(_asMap(raw));
   }
 
+  /// Enables the future hard subscription gate for the current company.
+  /// This is intentionally off during the pilot.
+  Future<BillingState> setAccessEnforced(bool enabled) async {
+    final raw = await _client.rpc(
+      'billing_set_access_enforced',
+      params: {'p_enabled': enabled},
+    );
+    return BillingState.fromJson(_asMap(raw));
+  }
+
   Future<BillingState> setNotes(String notes) async {
     final raw = await _client.rpc(
       'billing_set_notes',

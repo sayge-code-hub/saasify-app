@@ -1,24 +1,22 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/branding/company_branding.dart';
 import '../../../../core/layout/breakpoints.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_message_dialog.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../injection_container.dart';
-import '../../../hrms/presentation/widgets/employee_avatar.dart';
 import '../../../hrms/presentation/widgets/employee_form_layout.dart';
 import '../../domain/entities/settings_entities.dart';
 import '../../domain/usecases/update_company_logo_usecase.dart';
 import '../bloc/company_details/company_details_bloc.dart';
 
 class CompanyDetailsPage extends StatelessWidget {
-  const CompanyDetailsPage({
-    super.key,
-    this.onBack,
-  });
+  const CompanyDetailsPage({super.key, this.onBack});
 
   final VoidCallback? onBack;
 
@@ -58,18 +56,52 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
 
   Future<void> _pickAndUploadLogo(CompanyDetails details) async {
     if (_uploadingLogo) return;
-    final files = await FilePicker.pickFiles(type: FileType.image);
-    if (files.isEmpty || !mounted) return;
-    final file = files.first;
-    final bytes = await file.readAsBytes();
+    final source = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (source == null || !mounted) return;
+
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: source.path,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      maxWidth: 1024,
+      maxHeight: 1024,
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: 92,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop company logo',
+          toolbarColor: AppColors.text,
+          toolbarWidgetColor: AppColors.background,
+          lockAspectRatio: true,
+          hideBottomControls: true,
+          cropStyle: CropStyle.rectangle,
+        ),
+        IOSUiSettings(
+          title: 'Crop company logo',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+          rotateButtonsHidden: false,
+        ),
+        WebUiSettings(
+          context: context,
+          presentStyle: WebPresentStyle.dialog,
+          size: const CropperSize(width: 520, height: 520),
+          viewMode: WebViewMode.mode_3,
+          dragMode: WebDragMode.move,
+          initialAspectRatio: 1,
+          cropBoxResizable: false,
+        ),
+      ],
+    );
+    if (cropped == null || !mounted) return;
+    final bytes = await cropped.readAsBytes();
     if (bytes.isEmpty || !mounted) return;
 
     setState(() => _uploadingLogo = true);
     final result = await sl<UpdateCompanyLogoUseCase>()(
       companyId: details.id,
       bytes: bytes,
-      fileName: file.name,
-      mimeType: _mimeFor(file.extension, file.name),
+      fileName: 'company_logo.jpg',
+      mimeType: 'image/jpeg',
     );
     if (!mounted) return;
     setState(() => _uploadingLogo = false);
@@ -82,36 +114,13 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
       ),
       (updated) async {
         context.read<CompanyDetailsBloc>().add(
-              CompanyDetailsLogoUpdated(updated),
-            );
-        if (!mounted) return;
-        await showAppMessageDialog(
-          context,
-          message: 'Company logo updated',
+          CompanyDetailsLogoUpdated(updated),
         );
+        CompanyBranding.refresh();
+        if (!mounted) return;
+        await showAppMessageDialog(context, message: 'Company logo updated');
       },
     );
-  }
-
-  static String _mimeFor(String? extension, String fileName) {
-    final ext = (extension ?? '').toLowerCase();
-    if (ext.isEmpty && fileName.contains('.')) {
-      final fromName = fileName.split('.').last.toLowerCase();
-      return _mimeFor(fromName, fileName);
-    }
-    switch (ext) {
-      case 'png':
-        return 'image/png';
-      case 'webp':
-        return 'image/webp';
-      case 'gif':
-        return 'image/gif';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      default:
-        return 'image/jpeg';
-    }
   }
 
   @override
@@ -148,20 +157,20 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
 
   void _pushFields(BuildContext context) {
     context.read<CompanyDetailsBloc>().add(
-          CompanyDetailsFieldChanged(
-            displayName: _displayName.text,
-            address: _address.text,
-            gstin: _gstin.text,
-            pan: _pan.text,
-            sacCode: _sac.text,
-            telephone: _tel.text,
-            email: _email.text,
-            bankName: _bankName.text,
-            bankAccountNo: _account.text,
-            bankBranch: _branch.text,
-            bankIfsc: _ifsc.text,
-          ),
-        );
+      CompanyDetailsFieldChanged(
+        displayName: _displayName.text,
+        address: _address.text,
+        gstin: _gstin.text,
+        pan: _pan.text,
+        sacCode: _sac.text,
+        telephone: _tel.text,
+        email: _email.text,
+        bankName: _bankName.text,
+        bankAccountNo: _account.text,
+        bankBranch: _branch.text,
+        bankIfsc: _ifsc.text,
+      ),
+    );
   }
 
   @override
@@ -178,10 +187,7 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
         final details = state.details;
         if (details != null) _bind(details);
         if (state.status == CompanyDetailsStatus.success) {
-          await showAppMessageDialog(
-            context,
-            message: 'Company details saved',
-          );
+          await showAppMessageDialog(context, message: 'Company details saved');
         }
       },
       builder: (context, state) {
@@ -197,10 +203,9 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
           return Center(
             child: Text(
               state.errorMessage ?? 'Company details unavailable.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColors.error),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.error),
             ),
           );
         }
@@ -223,66 +228,25 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 20),
-                      child: GestureDetector(
-                        onTap: saving || logoBusy
-                            ? null
-                            : () => _pickAndUploadLogo(details),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            EmployeeAvatar(
-                              name: details.displayName.isNotEmpty
-                                  ? details.displayName
-                                  : details.name,
-                              photoUrl: details.logoUrl,
-                              radius: isDesktop ? 44 : 40,
-                              fontSize: isDesktop ? 22 : 20,
-                            ),
-                            if (logoBusy)
-                              Positioned.fill(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.background
-                                        .withValues(alpha: 0.6),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Center(
-                                    child: SizedBox(
-                                      width: 28,
-                                      height: 28,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            if (!saving && !logoBusy)
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: AppColors.highlight,
-                                  child: Icon(
-                                    Icons.camera_alt_outlined,
-                                    size: 16,
-                                    color: AppColors.background,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                      child: _SquareCompanyLogoPicker(
+                        logoUrl: details.logoUrl,
+                        name: details.displayName.isNotEmpty
+                            ? details.displayName
+                            : details.name,
+                        size: isDesktop ? 112 : 96,
+                        busy: logoBusy,
+                        enabled: !saving && !logoBusy,
+                        onTap: () => _pickAndUploadLogo(details),
                       ),
                     ),
                   ),
                   Text(
                     'GST & identity',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.highlight,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: AppColors.highlight,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   AppTextField(
@@ -337,10 +301,10 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
                   Text(
                     'Bank details',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.highlight,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: AppColors.highlight,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   AppTextField(
@@ -375,9 +339,9 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
                     Text(
                       state.errorMessage!,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.error,
-                            fontSize: 13,
-                          ),
+                        color: AppColors.error,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ],
@@ -395,9 +359,9 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
                   enabled: !saving,
                   onPressed: () {
                     _pushFields(context);
-                    context
-                        .read<CompanyDetailsBloc>()
-                        .add(const CompanyDetailsSubmitted());
+                    context.read<CompanyDetailsBloc>().add(
+                      const CompanyDetailsSubmitted(),
+                    );
                   },
                 ),
               ],
@@ -405,6 +369,117 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
           ],
         );
       },
+    );
+  }
+}
+
+class _SquareCompanyLogoPicker extends StatelessWidget {
+  const _SquareCompanyLogoPicker({
+    required this.logoUrl,
+    required this.name,
+    required this.size,
+    required this.busy,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String? logoUrl;
+  final String name;
+  final double size;
+  final bool busy;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = logoUrl?.trim() ?? '';
+    return Semantics(
+      button: true,
+      label: 'Upload and crop company logo',
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: size,
+              height: size,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: url.isNotEmpty
+                  ? Image.network(
+                      url,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _LogoFallback(name: name),
+                    )
+                  : _LogoFallback(name: name),
+            ),
+            if (busy)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.background.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+              ),
+            if (enabled)
+              Positioned(
+                right: -8,
+                bottom: -8,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.highlight,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: AppColors.background, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_outlined,
+                    size: 17,
+                    color: AppColors.background,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoFallback extends StatelessWidget {
+  const _LogoFallback({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = name.trim();
+    final initial = trimmed.isEmpty
+        ? 'C'
+        : trimmed.substring(0, 1).toUpperCase();
+    return Center(
+      child: Text(
+        initial,
+        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+          color: AppColors.text,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

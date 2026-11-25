@@ -120,7 +120,9 @@ abstract final class AppAccess {
     }
 
     final path = Uri.tryParse(location)?.path ?? location;
-    if (path == AppRoutes.dashboard || path == AppRoutes.employeeIdCard) {
+    if (path == AppRoutes.dashboard ||
+        path == AppRoutes.employeeIdCard ||
+        path == AppRoutes.employeeDocuments) {
       return true;
     }
     if (path == AppRoutes.myDetails) return true;

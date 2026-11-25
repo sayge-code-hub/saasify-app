@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -8,19 +9,18 @@ import '../../../../core/layout/breakpoints.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../core/widgets/app_button.dart';
+import '../../../../core/utils/pdf_saver.dart';
 import '../../../../core/widgets/app_dropdown.dart';
 import '../../../../core/widgets/app_message_dialog.dart';
-import '../../../../core/widgets/app_text_field.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/domain/entities/user.dart';
 import '../../../hrms/domain/entities/employee.dart';
-import '../../../hrms/domain/usecases/update_employee.dart';
 import '../../../hrms/presentation/bloc/employees/employees_bloc.dart';
 import '../../../hrms/presentation/widgets/employee_avatar.dart';
 import '../../../hrms/presentation/widgets/employee_documents_section.dart';
 import '../../../payroll/domain/services/payslip_period.dart';
 import '../../../payroll/presentation/bloc/payroll_bloc.dart';
+import '../../data/employee_id_card_pdf_builder.dart';
 
 /// Employee self-service: profile, salary slips and a non-sensitive ID card.
 class EmployeeDashboardPage extends StatelessWidget {
@@ -28,28 +28,43 @@ class EmployeeDashboardPage extends StatelessWidget {
     super.key,
     this.showSalarySlips = false,
     this.showIdCard = false,
+    this.showDocuments = false,
   });
 
   final bool showSalarySlips;
   final bool showIdCard;
+  final bool showDocuments;
 
   @override
   Widget build(BuildContext context) {
     if (showSalarySlips) {
       return BlocProvider(
         create: (_) => sl<PayrollBloc>()..add(const PayrollStarted()),
-        child: const _DashboardBody(isSlips: true, isIdCard: false),
+        child: const _DashboardBody(
+          isSlips: true,
+          isIdCard: false,
+          isDocuments: false,
+        ),
       );
     }
-    return _DashboardBody(isSlips: false, isIdCard: showIdCard);
+    return _DashboardBody(
+      isSlips: false,
+      isIdCard: showIdCard,
+      isDocuments: showDocuments,
+    );
   }
 }
 
 class _DashboardBody extends StatelessWidget {
-  const _DashboardBody({required this.isSlips, required this.isIdCard});
+  const _DashboardBody({
+    required this.isSlips,
+    required this.isIdCard,
+    required this.isDocuments,
+  });
 
   final bool isSlips;
   final bool isIdCard;
+  final bool isDocuments;
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +94,9 @@ class _DashboardBody extends StatelessWidget {
         }
         if (isIdCard) {
           return _EmployeeIdCardView(employee: me, user: user);
+        }
+        if (isDocuments) {
+          return _EmployeeDocumentsView(employee: me);
         }
         return _ProfileView(employee: me, user: user);
       },
@@ -157,17 +175,7 @@ class _ProfileView extends StatelessWidget {
                 ],
                 const SizedBox(height: 16),
                 _DetailsGrid(fields: fields, isDesktop: isDesktop),
-                if (linked) ...[
-                  const SizedBox(height: 16),
-                  _ContactEditCard(employee: employee!),
-                  const SizedBox(height: 16),
-                  EmployeeDocumentsSection(
-                    employeeId: employee!.employeeId,
-                    employeeName: employee!.employeeName,
-                    isDesktop: isDesktop,
-                    canUpload: true,
-                  ),
-                ] else ...[
+                if (!linked) ...[
                   const SizedBox(height: 16),
                   Text(
                     'Your profile is not linked to an employee record yet. '
@@ -181,6 +189,57 @@ class _ProfileView extends StatelessWidget {
                   ),
                 ],
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmployeeDocumentsView extends StatelessWidget {
+  const _EmployeeDocumentsView({this.employee});
+
+  final Employee? employee;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = Breakpoints.isDesktop(context);
+    final horizontal = isDesktop ? 32.0 : 16.0;
+    final employee = this.employee;
+    if (employee == null) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(horizontal, 24, horizontal, 32),
+        child: Text(
+          'Your profile is not linked to an employee record yet.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.textLight),
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          horizontal,
+          isDesktop ? 24 : 16,
+          horizontal,
+          40,
+        ),
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 880 : double.infinity,
+            ),
+            child: EmployeeDocumentsSection(
+              employeeId: employee.employeeId,
+              employeeName: employee.employeeName,
+              isDesktop: isDesktop,
+              // Employee self-service is read-only. Uploading or viewing other
+              // employees' records remains an owner/staff action in HRMS/DMS.
+              canUpload: false,
             ),
           ),
         ],
@@ -310,17 +369,50 @@ class _IdCardShortcut extends StatelessWidget {
   }
 }
 
-class _EmployeeIdCardView extends StatelessWidget {
+class _EmployeeIdCardView extends StatefulWidget {
   const _EmployeeIdCardView({this.employee, this.user});
 
   final Employee? employee;
   final User? user;
 
   @override
+  State<_EmployeeIdCardView> createState() => _EmployeeIdCardViewState();
+}
+
+class _EmployeeIdCardViewState extends State<_EmployeeIdCardView> {
+  bool _showBack = false;
+  bool _downloading = false;
+
+  Future<void> _downloadCard(Employee employee, bool isSayge) async {
+    if (_downloading) return;
+    setState(() => _downloading = true);
+    try {
+      final bytes = await EmployeeIdCardPdfBuilder.build(
+        employee: employee,
+        user: widget.user,
+        isSayge: isSayge,
+      );
+      await savePdfBytes(
+        bytes: bytes,
+        filename: 'ID_Card_${employee.employeeId}.pdf',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      await showAppMessageDialog(
+        context,
+        title: 'Could not download ID card',
+        message: 'Please try again. If the issue continues, contact your administrator.',
+      );
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDesktop = Breakpoints.isDesktop(context);
     final horizontal = isDesktop ? 32.0 : 16.0;
-    final employee = this.employee;
+    final employee = widget.employee;
     if (employee == null) {
       return Padding(
         padding: EdgeInsets.fromLTRB(horizontal, 24, horizontal, 32),
@@ -333,7 +425,20 @@ class _EmployeeIdCardView extends StatelessWidget {
       );
     }
 
-    final textTheme = Theme.of(context).textTheme;
+    final isSayge = widget.user?.companyId?.trim() == 'company_sayge';
+    final front = _EmployeeIdCardFace(
+      employee: employee,
+      user: widget.user,
+      isSayge: isSayge,
+      isBack: false,
+    );
+    final back = _EmployeeIdCardFace(
+      employee: employee,
+      user: widget.user,
+      isSayge: isSayge,
+      isBack: true,
+    );
+
     return Align(
       alignment: Alignment.topCenter,
       child: ListView(
@@ -344,147 +449,62 @@ class _EmployeeIdCardView extends StatelessWidget {
           40,
         ),
         children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: AppColors.text,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x22000000),
-                    blurRadius: 24,
-                    offset: Offset(0, 12),
-                  ),
-                ],
+          if (isDesktop)
+            Center(
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 32,
+                runSpacing: 24,
+                children: [front, back],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.badge_rounded,
-                            color: AppColors.text,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'SAASIFY',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const Text(
-                          'EMPLOYEE ID',
-                          style: TextStyle(
-                            color: Color(0xFFCACACA),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ],
+            )
+          else ...[
+            Center(
+              child: SizedBox(
+                width: 310,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 240),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: Tween<double>(
+                        begin: 0.97,
+                        end: 1,
+                      ).animate(animation),
+                      child: child,
                     ),
                   ),
-                  Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.all(24),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        EmployeeAvatar(
-                          name: employee.employeeName,
-                          photoUrl: employee.photoUrl,
-                          radius: 38,
-                          fontSize: 22,
-                        ),
-                        const SizedBox(width: 18),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                employee.employeeName,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.text,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                employee.designation.trim().isEmpty
-                                    ? 'Employee'
-                                    : employee.designation,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.textLight,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _IdCardDetail(
-                                label: 'EMPLOYEE ID',
-                                value: employee.employeeId,
-                              ),
-                              const SizedBox(height: 10),
-                              _IdCardDetail(
-                                label: 'DEPARTMENT',
-                                value: employee.department.trim().isEmpty
-                                    ? '—'
-                                    : employee.department,
-                              ),
-                              const SizedBox(height: 10),
-                              _IdCardDetail(
-                                label: 'LOCATION',
-                                value: employee.location.trim().isEmpty
-                                    ? '—'
-                                    : employee.location,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: KeyedSubtree(
+                    key: ValueKey<bool>(_showBack),
+                    child: _showBack ? back : front,
                   ),
-                  Container(
-                    color: AppColors.surfaceMuted,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
-                    ),
-                    child: Text(
-                      user?.email ?? '',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppColors.textLight,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'This card is for identification only.',
-            textAlign: TextAlign.center,
-            style: textTheme.bodySmall?.copyWith(color: AppColors.textLight),
+            const SizedBox(height: 14),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: () => setState(() => _showBack = !_showBack),
+                icon: const Icon(Icons.flip_camera_android_outlined, size: 18),
+                label: Text(_showBack ? 'Show front' : 'Show back'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Center(
+            child: OutlinedButton.icon(
+              onPressed: _downloading
+                  ? null
+                  : () => _downloadCard(employee, isSayge),
+              icon: _downloading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_outlined, size: 19),
+              label: Text(_downloading ? 'Preparing PDF…' : 'Download PDF'),
+            ),
           ),
         ],
       ),
@@ -492,38 +512,282 @@ class _EmployeeIdCardView extends StatelessWidget {
   }
 }
 
-class _IdCardDetail extends StatelessWidget {
-  const _IdCardDetail({required this.label, required this.value});
+class _EmployeeIdCardFace extends StatelessWidget {
+  const _EmployeeIdCardFace({
+    required this.employee,
+    required this.user,
+    required this.isSayge,
+    required this.isBack,
+  });
 
-  final String label;
-  final String value;
+  final Employee employee;
+  final User? user;
+  final bool isSayge;
+  final bool isBack;
+
+  static const _saygeOrange = Color(0xFFFF6A4B);
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textLight,
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.7,
-          ),
+    return SizedBox(
+      width: 310,
+      height: 522,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: const Color(0xFF36363A)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1F000000),
+              blurRadius: 20,
+              offset: Offset(0, 10),
+            ),
+          ],
         ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.text,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
+        child: isBack ? _buildBack(context) : _buildFront(context),
+      ),
+    );
+  }
+
+  Widget _buildFront(BuildContext context) {
+    final role = employee.designation.trim().isEmpty
+        ? 'Employee'
+        : employee.designation.trim();
+    final code = employee.employeeId.trim().isEmpty
+        ? '—'
+        : employee.employeeId.trim();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(19, 28, 19, 19),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Image.asset(
+                isSayge
+                    ? 'assets/images/sayge_logo.png'
+                    : 'assets/images/saasify_logo.png',
+                width: 111,
+                height: 25,
+                fit: BoxFit.contain,
+                alignment: Alignment.centerLeft,
+              ),
+              const Spacer(),
+              Container(
+                constraints: const BoxConstraints(maxWidth: 92),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF36363A)),
+                ),
+                child: Text(
+                  role,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Employee Code : $code',
+              style: const TextStyle(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 31),
+          Text(
+            employee.employeeName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _saygeOrange,
+              fontSize: 37,
+              height: 0.95,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1.3,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              const Icon(
+                Icons.phone_in_talk_outlined,
+                size: 13,
+                color: Color(0xFF2B3F6C),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  employee.contactNo.trim().isEmpty
+                      ? '—'
+                      : employee.contactNo.trim(),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          Expanded(child: _IdCardPhoto(employee: employee)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBack(BuildContext context) {
+    if (isSayge) {
+      // Approved Sayge reverse-card artwork. It contains the official contact
+      // details (+91 - 8788681499 and humans@sayge.in) as outlined artwork so
+      // the exact layout is preserved at every device size.
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(29),
+        child: SvgPicture.asset(
+          'assets/images/id_cards/sayge_id_card_back.svg',
+          fit: BoxFit.fill,
+          width: 310,
+          height: 522,
         ),
-      ],
+      );
+    }
+    final companyName = isSayge ? 'Sayge' : 'Saasify';
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Image.asset(
+              isSayge
+                  ? 'assets/images/sayge_logo.png'
+                  : 'assets/images/saasify_logo.png',
+              width: 136,
+              height: 34,
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 50),
+          const Icon(Icons.badge_outlined, size: 74, color: _saygeOrange),
+          const SizedBox(height: 24),
+          Text(
+            'Employee identity card',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'This card is issued by $companyName and remains company property. '
+            'Please return it when your employment ends.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textLight,
+              height: 1.45,
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F8F8),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  employee.employeeId,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  user?.email ?? '',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'If found, please return this card to the issuing company.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 9.5, color: AppColors.textLight),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IdCardPhoto extends StatelessWidget {
+  const _IdCardPhoto({required this.employee});
+
+  final Employee employee;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = employee.photoUrl?.trim();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(15),
+      child: ColoredBox(
+        color: const Color(0xFFF0E2D5),
+        child: photoUrl == null || photoUrl.isEmpty
+            ? Center(
+                child: Text(
+                  employee.employeeName.isEmpty
+                      ? '—'
+                      : employee.employeeName[0].toUpperCase(),
+                  style: const TextStyle(
+                    color: Color(0xFF6E5547),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 72,
+                  ),
+                ),
+              )
+            : Image.network(
+                photoUrl,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, error, stackTrace) => Center(
+                  child: Text(
+                    employee.employeeName.isEmpty
+                        ? '—'
+                        : employee.employeeName[0].toUpperCase(),
+                    style: const TextStyle(
+                      color: Color(0xFF6E5547),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 72,
+                    ),
+                  ),
+                ),
+              ),
+      ),
     );
   }
 }
@@ -794,148 +1058,6 @@ class _SalarySlipDownload extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _ContactEditCard extends StatefulWidget {
-  const _ContactEditCard({required this.employee});
-
-  final Employee employee;
-
-  @override
-  State<_ContactEditCard> createState() => _ContactEditCardState();
-}
-
-class _ContactEditCardState extends State<_ContactEditCard> {
-  late final TextEditingController _contactNo;
-  late final TextEditingController _personalEmail;
-  late final TextEditingController _address;
-  late final TextEditingController _alternate;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final e = widget.employee;
-    _contactNo = TextEditingController(text: e.contactNo);
-    _personalEmail = TextEditingController(text: e.personalEmail);
-    _address = TextEditingController(text: e.residentialAddress);
-    _alternate = TextEditingController(text: e.alternateContact);
-  }
-
-  @override
-  void didUpdateWidget(covariant _ContactEditCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.employee.employeeId != widget.employee.employeeId ||
-        oldWidget.employee.contactNo != widget.employee.contactNo ||
-        oldWidget.employee.personalEmail != widget.employee.personalEmail ||
-        oldWidget.employee.residentialAddress !=
-            widget.employee.residentialAddress ||
-        oldWidget.employee.alternateContact !=
-            widget.employee.alternateContact) {
-      _contactNo.text = widget.employee.contactNo;
-      _personalEmail.text = widget.employee.personalEmail;
-      _address.text = widget.employee.residentialAddress;
-      _alternate.text = widget.employee.alternateContact;
-    }
-  }
-
-  @override
-  void dispose() {
-    _contactNo.dispose();
-    _personalEmail.dispose();
-    _address.dispose();
-    _alternate.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    final updated = widget.employee.copyWith(
-      contactNo: _contactNo.text.trim(),
-      personalEmail: _personalEmail.text.trim(),
-      residentialAddress: _address.text.trim(),
-      alternateContact: _alternate.text.trim(),
-    );
-    final result = await sl<UpdateEmployeeUseCase>()(updated);
-    if (!mounted) return;
-    setState(() => _saving = false);
-    await result.fold(
-      (failure) => showAppMessageDialog(
-        context,
-        title: 'Contact details',
-        message: failure.message,
-      ),
-      (_) async {
-        context.read<EmployeesBloc>().add(const EmployeesRequested());
-        await showAppMessageDialog(context, message: 'Contact details updated');
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Contact details',
-            style: textTheme.titleMedium?.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppColors.highlight,
-            ),
-          ),
-          const SizedBox(height: 14),
-          AppTextField(
-            label: 'Contact no.',
-            controller: _contactNo,
-            enabled: !_saving,
-            keyboardType: TextInputType.phone,
-          ),
-          const SizedBox(height: 12),
-          AppTextField(
-            label: 'Personal email',
-            controller: _personalEmail,
-            enabled: !_saving,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          const SizedBox(height: 12),
-          AppTextField(
-            label: 'Alternate contact',
-            controller: _alternate,
-            enabled: !_saving,
-            keyboardType: TextInputType.phone,
-          ),
-          const SizedBox(height: 12),
-          AppTextField(
-            label: 'Residential address',
-            controller: _address,
-            enabled: !_saving,
-            maxLines: 3,
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerRight,
-            child: AppButton(
-              label: _saving ? 'Saving…' : 'Save contact',
-              isLoading: _saving,
-              enabled: !_saving,
-              onPressed: _save,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

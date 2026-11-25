@@ -82,7 +82,7 @@ void main() {
     await sl.reset();
   });
 
-  testWidgets('settings hub includes Categories', (tester) async {
+  testWidgets('settings hub includes POS Categories', (tester) async {
     tester.view.physicalSize = const Size(1440, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -92,7 +92,7 @@ void main() {
       MaterialApp(theme: AppTheme.light, home: const SettingsHubPage()),
     );
 
-    expect(find.text('Categories'), findsOneWidget);
+    expect(find.text('POS Categories'), findsOneWidget);
 
     final firstRow = [
       'Invite employee',

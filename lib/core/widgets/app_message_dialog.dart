@@ -24,15 +24,15 @@ Future<void> showAppMessageDialog(
         title: Text(
           title,
           style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
-                color: AppColors.text,
-                fontWeight: FontWeight.w600,
-              ),
+            color: AppColors.text,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Text(
           message,
-          style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
-                color: AppColors.text,
-              ),
+          style: Theme.of(
+            dialogContext,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.text),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
         actions: [
@@ -73,15 +73,15 @@ Future<bool> confirmLeaveForm(
         title: Text(
           title,
           style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
-                color: AppColors.text,
-                fontWeight: FontWeight.w600,
-              ),
+            color: AppColors.text,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Text(
           message,
-          style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
-                color: AppColors.text,
-              ),
+          style: Theme.of(
+            dialogContext,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.text),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
         actions: [
@@ -93,6 +93,53 @@ Future<bool> confirmLeaveForm(
             width: 120,
             child: AppButton(
               label: leaveLabel,
+              expand: true,
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+  return result == true;
+}
+
+/// Confirms an intentional sign-out before the local auth session is cleared.
+Future<bool> confirmLogout(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return AlertDialog(
+        backgroundColor: AppColors.background,
+        surfaceTintColor: AppColors.background,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        title: Text(
+          'Log out?',
+          style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+            color: AppColors.text,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'You will need to sign in again to access your workspace.',
+          style: Theme.of(
+            dialogContext,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.text),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          SizedBox(
+            width: 120,
+            child: AppButton(
+              label: 'Log out',
               expand: true,
               onPressed: () => Navigator.of(dialogContext).pop(true),
             ),

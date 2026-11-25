@@ -188,6 +188,8 @@ class BillingSnapshot {
   const BillingSnapshot({
     required this.status,
     required this.writesAllowed,
+    required this.accessEnforced,
+    required this.accessAllowed,
     required this.posEnabled,
     required this.canAddEmployee,
     required this.activeEmployees,
@@ -200,6 +202,10 @@ class BillingSnapshot {
 
   final BillingStatus status;
   final bool writesAllowed;
+  /// When true, inactive subscriptions cannot open normal product screens.
+  /// It remains false during the pilot.
+  final bool accessEnforced;
+  final bool accessAllowed;
   final bool posEnabled;
   final bool canAddEmployee;
   final int activeEmployees;
@@ -212,6 +218,8 @@ class BillingSnapshot {
   static const permissive = BillingSnapshot(
     status: BillingStatus.active,
     writesAllowed: true,
+    accessEnforced: false,
+    accessAllowed: true,
     posEnabled: true,
     canAddEmployee: true,
     activeEmployees: 0,
@@ -232,6 +240,8 @@ class BillingSnapshot {
     return BillingSnapshot(
       status: BillingStatus.fromDb(json['status']?.toString()),
       writesAllowed: json['writes_allowed'] != false,
+      accessEnforced: json['access_enforced'] == true,
+      accessAllowed: json['access_allowed'] != false,
       posEnabled: json['pos_enabled'] != false,
       canAddEmployee: json['can_add_employee'] != false,
       activeEmployees: _int(json['active_employees']),
@@ -285,6 +295,9 @@ class BillingState {
         (sub['status'] ?? json['status'])?.toString(),
       ),
       writesAllowed: json['writes_allowed'] != false,
+      accessEnforced: sub['access_enforced'] == true ||
+          json['access_enforced'] == true,
+      accessAllowed: json['access_allowed'] != false,
       posEnabled: sub['pos_enabled'] != false,
       canAddEmployee: json['can_add_employee'] != false,
       activeEmployees: _int(json['active_employees']),

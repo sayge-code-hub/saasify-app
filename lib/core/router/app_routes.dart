@@ -16,6 +16,9 @@ abstract final class AppRoutes {
   /// Employee self-service identity card.
   static const employeeIdCard = '/dashboard/id-card';
 
+  /// Employee DMS view, restricted to the signed-in employee's own documents.
+  static const employeeDocuments = '/dashboard/documents';
+
   /// Employee self-service landing when no `employee_id` is linked yet.
   static const myDetails = '/hrms/me';
   static const employees = '/hrms/employees';
@@ -32,6 +35,7 @@ abstract final class AppRoutes {
   static const proposals = '/proposals';
   static const invoices = '/invoices';
   static const expenses = '/expenses';
+  static const purchaseOrders = '/purchase-orders';
   static const settings = '/settings';
   static const clients = '/settings/clients';
   static const clientsAdd = '/settings/clients/add';
@@ -43,6 +47,9 @@ abstract final class AppRoutes {
   static const inviteEmployee = '/settings/invite';
   static const manageInvites = '/settings/invites';
   static const billing = '/settings/billing';
+
+  /// Access gate for a future enforced subscription. Not used during pilot.
+  static const subscriptionRequired = '/subscription-required';
   static const platformModules = '/settings/modules';
   static const setPassword = '/set-password';
 

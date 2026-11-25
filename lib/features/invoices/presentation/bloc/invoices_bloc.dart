@@ -58,7 +58,10 @@ class InvoicesBloc extends Bloc<InvoicesEvent, InvoicesState> {
     final invoicesResult = await getInvoicesUseCase();
     final posResult = await getAllPosUseCase();
 
-    final pos = posResult.fold((_) => <EmployeePurchaseOrder>[], (list) => list);
+    final pos = posResult.fold(
+      (_) => <EmployeePurchaseOrder>[],
+      (list) => list,
+    );
 
     invoicesResult.fold(
       (failure) => emit(
@@ -121,10 +124,7 @@ class InvoicesBloc extends Bloc<InvoicesEvent, InvoicesState> {
     );
   }
 
-  void _onEditOpened(
-    InvoiceEditOpened event,
-    Emitter<InvoicesState> emit,
-  ) {
+  void _onEditOpened(InvoiceEditOpened event, Emitter<InvoicesState> emit) {
     emit(_formFromInvoice(event.invoice, editingId: event.invoice.id));
   }
 
@@ -322,8 +322,7 @@ class InvoicesBloc extends Bloc<InvoicesEvent, InvoicesState> {
     if (poNumber.isNotEmpty) {
       final matches = state.purchaseOrders
           .where(
-            (po) =>
-                po.poNumber.trim().toLowerCase() == poNumber.toLowerCase(),
+            (po) => po.poNumber.trim().toLowerCase() == poNumber.toLowerCase(),
           )
           .toList(growable: false);
 
@@ -360,10 +359,10 @@ class InvoicesBloc extends Bloc<InvoicesEvent, InvoicesState> {
     emit(state.copyWith(status: InvoicesStatus.saving, clearError: true));
 
     final latest = await getInvoicesUseCase();
-    final competitors = latest.fold(
-      (_) => state.invoices,
-      (list) => list,
-    ).where((e) => e.id != editingId).map((e) => e.invoiceNo);
+    final competitors = latest
+        .fold((_) => state.invoices, (list) => list)
+        .where((e) => e.id != editingId)
+        .map((e) => e.invoiceNo);
     if (InvoiceCalculator.isInvoiceNoTaken(invoiceNo, competitors)) {
       emit(
         state.copyWith(
@@ -382,6 +381,23 @@ class InvoicesBloc extends Bloc<InvoicesEvent, InvoicesState> {
       taxable: taxable,
       intraState: event.intraState,
     );
+
+    final double amountPaid = switch (event.paymentStatus) {
+      InvoicePaymentStatus.paid => tax.total.toDouble(),
+      InvoicePaymentStatus.partial => event.amountPaid,
+      _ => 0,
+    };
+    if (event.paymentStatus == InvoicePaymentStatus.partial &&
+        (amountPaid <= 0 || amountPaid >= tax.total)) {
+      emit(
+        state.copyWith(
+          status: InvoicesStatus.failure,
+          errorMessage:
+              'Enter an amount received that is greater than zero and less than the invoice total.',
+        ),
+      );
+      return;
+    }
 
     final invoice = Invoice(
       id: editingId ?? 'inv_${DateTime.now().microsecondsSinceEpoch}',
@@ -403,7 +419,7 @@ class InvoicesBloc extends Bloc<InvoicesEvent, InvoicesState> {
       totalAmount: tax.total,
       amountInWords: InvoiceCalculator.amountInWords(tax.total),
       paymentStatus: event.paymentStatus,
-      amountPaid: event.amountPaid,
+      amountPaid: amountPaid,
       dueDate: event.dueDate,
       paidAt: event.paidAt,
     );
