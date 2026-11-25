@@ -269,6 +269,11 @@ GoRouter createAppRouter(AuthSession authSession) {
             ),
           ),
           GoRoute(
+            path: AppRoutes.employeeIdCard,
+            pageBuilder: (context, state) =>
+                _page(state, const EmployeeDashboardPage(showIdCard: true)),
+          ),
+          GoRoute(
             path: AppRoutes.hrms,
             pageBuilder: (context, state) =>
                 _page(state, const HrmsOverviewPage()),

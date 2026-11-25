@@ -165,17 +165,8 @@ class _HomeShellState extends State<HomeShell> {
         ),
       if (_modules.isEnabled(SaasifyModule.hrms))
         AppNavSection(
-          label: 'Pay & Compliance',
-          icon: Icons.account_balance_wallet_outlined,
-          selectable: linked,
-          enabled: linked,
-          items: const [],
-        ),
-      if (_modules.isEnabled(SaasifyModule.finances))
-        AppNavSection(
-          label: 'Expense',
-          icon: Icons.account_balance_outlined,
-          iconAsset: 'assets/images/nav_expense.png',
+          label: 'My ID Card',
+          icon: Icons.badge_outlined,
           selectable: linked,
           enabled: linked,
           items: const [],
@@ -216,9 +207,7 @@ class _HomeShellState extends State<HomeShell> {
     return [
       if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.dashboard,
       if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.dashboardSlips,
-      if (_modules.isEnabled(SaasifyModule.hrms))
-        AppRoutes.employeeCompensation(id),
-      if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.expenses,
+      if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.employeeIdCard,
     ];
   }
 
@@ -233,11 +222,8 @@ class _HomeShellState extends State<HomeShell> {
     }
 
     if (!_isStaff) {
-      if (location.startsWith(AppRoutes.expenses)) {
-        return paths.indexOf(AppRoutes.expenses);
-      }
-      if (location.contains('/compensation')) {
-        return paths.indexWhere((path) => path.contains('/compensation'));
+      if (location.startsWith(AppRoutes.employeeIdCard)) {
+        return paths.indexOf(AppRoutes.employeeIdCard);
       }
       if (location.contains('section=slips')) {
         return paths.indexOf(AppRoutes.dashboardSlips);
@@ -293,6 +279,7 @@ class _HomeShellState extends State<HomeShell> {
       if (location.contains('section=slips')) return 'Salary Slips';
       return 'Dashboard';
     }
+    if (path == AppRoutes.employeeIdCard) return 'My ID Card';
     if (path == AppRoutes.myDetails) return 'Dashboard';
     if (path == AppRoutes.employeesAdd) return 'Add employee';
     if (path.endsWith('/edit') && path.startsWith('/hrms/employees/')) {
@@ -366,9 +353,6 @@ class _HomeShellState extends State<HomeShell> {
     }
 
     if (!_isStaff) {
-      if (path.endsWith('/compensation')) {
-        return () => _goBack(AppRoutes.dashboard);
-      }
       return null;
     }
 
