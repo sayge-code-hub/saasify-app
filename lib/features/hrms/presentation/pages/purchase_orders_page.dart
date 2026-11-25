@@ -7,6 +7,7 @@ import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/app_message_dialog.dart';
+import '../../../../core/widgets/app_list_search_field.dart';
 import '../../../../injection_container.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/employee_purchase_order.dart';
@@ -24,6 +25,7 @@ class PurchaseOrdersPage extends StatefulWidget {
 
 class _PurchaseOrdersPageState extends State<PurchaseOrdersPage> {
   Future<List<EmployeePurchaseOrder>>? _orders;
+  String _query = '';
 
   @override
   void initState() {
@@ -95,19 +97,41 @@ class _PurchaseOrdersPageState extends State<PurchaseOrdersPage> {
                 child: Text('No purchase orders uploaded yet.'),
               );
             }
+            final query = _query.trim().toLowerCase();
+            final filtered = query.isEmpty
+                ? orders
+                : orders.where((order) {
+                    final employee = employees[order.employeeId];
+                    return order.poNumber.toLowerCase().contains(query) ||
+                        order.employeeId.toLowerCase().contains(query) ||
+                        (employee?.employeeName.toLowerCase().contains(query) ??
+                            false);
+                  }).toList();
             return RefreshIndicator(
               onRefresh: () async => setState(() => _orders = _load()),
-              child: ListView.separated(
+              child: ListView(
                 padding: const EdgeInsets.all(24),
-                itemCount: orders.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, index) => _PurchaseOrderCard(
-                  order: orders[index],
-                  employee: employees[orders[index].employeeId],
-                  onOpen: orders[index].hasFile
-                      ? () => _open(orders[index])
-                      : null,
-                ),
+                children: [
+                  AppListSearchField(
+                    hintText: 'Search purchase orders…',
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
+                  const SizedBox(height: 16),
+                  if (filtered.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 28),
+                      child: Center(child: Text('No purchase orders found.')),
+                    )
+                  else
+                    for (final order in filtered) ...[
+                      _PurchaseOrderCard(
+                        order: order,
+                        employee: employees[order.employeeId],
+                        onOpen: order.hasFile ? () => _open(order) : null,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                ],
               ),
             );
           },
@@ -130,28 +154,12 @@ class _PurchaseOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (color, icon, status) = switch ((
-      order.isExpired,
-      order.needsRenewal,
-    )) {
-      (true, _) => (AppColors.error, Icons.error_outline, 'Expired'),
-      (false, true) => (
-        Colors.orange.shade800,
-        Icons.schedule_outlined,
-        'Renew in ${order.daysUntilEnd} days',
-      ),
-      _ => (
-        AppColors.success,
-        Icons.verified_outlined,
-        'Active through ${AppDates.compact.format(order.endDate)}',
-      ),
-    };
     final name = employee?.employeeName ?? 'Employee ${order.employeeId}';
     return InkWell(
       onTap: () => context.go(AppRoutes.employeeDetail(order.employeeId)),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
@@ -159,8 +167,6 @@ class _PurchaseOrderCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,20 +180,39 @@ class _PurchaseOrderCard extends StatelessWidget {
                     '$name · ${order.employeeId}',
                     style: const TextStyle(color: AppColors.textLight),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    '${AppDates.compact.format(order.startDate)} — ${AppDates.compact.format(order.endDate)}',
-                    style: const TextStyle(color: AppColors.textLight),
-                  ),
                   const SizedBox(height: 7),
-                  Text(
-                    status,
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 14,
+                        color: AppColors.textLight,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${AppDates.compact.format(order.startDate)} — ${AppDates.compact.format(order.endDate)}',
+                        style: const TextStyle(
+                          color: AppColors.textLight,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
+                  if (order.isExpired) ...[
+                    const SizedBox(height: 8),
+                    _ExpiredChip(endDate: order.endDate),
+                  ],
+                  if (order.needsRenewal) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      'Renewal due in ${order.daysUntilEnd} days',
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -197,6 +222,33 @@ class _PurchaseOrderCard extends StatelessWidget {
               icon: const Icon(Icons.picture_as_pdf_outlined),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpiredChip extends StatelessWidget {
+  const _ExpiredChip({required this.endDate});
+
+  final DateTime endDate;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(
+          'Expired ${AppDates.compact.format(endDate)}',
+          style: const TextStyle(
+            color: AppColors.error,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
