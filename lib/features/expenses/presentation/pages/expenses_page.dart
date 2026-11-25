@@ -295,7 +295,10 @@ class _ExpenseListState extends State<_ExpenseList> {
                         ? ''
                         : dateFormat.format(expense.reportingDate!.toLocal());
                     final approving = widget.state.approvingId == expense.id;
-                    final canEdit =
+                    // Staff may correct an approved/paid expense; the edit
+                    // automatically returns it to pending for re-approval.
+                    // An employee may still edit only their own pending claim.
+                    final canEdit = isStaff ||
                         expense.approvalStatus == ExpenseApprovalStatus.pending;
                     return AppListCard(
                       child: Row(
@@ -359,7 +362,10 @@ class _ExpenseListState extends State<_ExpenseList> {
                                     ),
                                   if (canEdit)
                                     AppListIconButton(
-                                      tooltip: 'Edit pending',
+                                      tooltip: expense.approvalStatus ==
+                                              ExpenseApprovalStatus.pending
+                                          ? 'Edit expense'
+                                          : 'Edit and resubmit for approval',
                                       onPressed: busy
                                           ? null
                                           : () => context
@@ -444,6 +450,37 @@ class _ExpenseListState extends State<_ExpenseList> {
                                       ),
                                     ],
                                   ),
+                              if (isStaff &&
+                                  expense.approvalStatus ==
+                                      ExpenseApprovalStatus.approved) ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: busy
+                                      ? null
+                                      : () => context
+                                            .read<ExpensesBloc>()
+                                            .add(
+                                              ExpenseApprovalChanged(
+                                                expenseId: expense.id,
+                                                status: ExpenseApprovalStatus
+                                                    .paid,
+                                              ),
+                                            ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.success,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Mark paid',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
                               ],
                             ],
                           ),
@@ -470,6 +507,8 @@ class _ApprovalBadge extends StatelessWidget {
     switch (status) {
       case ExpenseApprovalStatus.approved:
         color = AppColors.success;
+      case ExpenseApprovalStatus.paid:
+        color = const Color(0xFF1E6FD9);
       case ExpenseApprovalStatus.rejected:
         color = AppColors.error;
       case ExpenseApprovalStatus.pending:

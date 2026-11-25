@@ -22,6 +22,8 @@ class BillingAccess extends ChangeNotifier {
   String? get lastError => _lastError;
 
   bool get writesAllowed => _snapshot.writesAllowed;
+  bool get accessEnforced => _snapshot.accessEnforced;
+  bool get accessAllowed => _snapshot.accessAllowed;
   bool get canAddEmployee => _snapshot.canAddEmployee;
   bool get posEnabled => _snapshot.posEnabled;
   bool get showBanner =>

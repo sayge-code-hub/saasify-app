@@ -1,12 +1,15 @@
 enum ExpenseApprovalStatus {
   pending,
   approved,
+  paid,
   rejected;
 
   static ExpenseApprovalStatus fromDb(String? raw) {
     switch ((raw ?? '').trim().toLowerCase()) {
       case 'approved':
         return ExpenseApprovalStatus.approved;
+      case 'paid':
+        return ExpenseApprovalStatus.paid;
       case 'rejected':
         return ExpenseApprovalStatus.rejected;
       case 'pending':
@@ -23,6 +26,8 @@ enum ExpenseApprovalStatus {
         return 'Pending';
       case ExpenseApprovalStatus.approved:
         return 'Approved';
+      case ExpenseApprovalStatus.paid:
+        return 'Paid';
       case ExpenseApprovalStatus.rejected:
         return 'Rejected';
     }

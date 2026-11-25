@@ -30,6 +30,8 @@ dependencies:
   shared_preferences: ^2.5.5
   flutter_svg: ^2.2.4
   qr_flutter: ^4.1.0
+  image_cropper: ^14.0.0
+  image_picker: ^1.2.4
 
 dev_dependencies:
   flutter_test:
@@ -50,6 +52,7 @@ flutter:
     - assets/images/proposal_signature.png
     - assets/images/nav_expense.png
     - assets/images/google_g_logo.svg
+    - assets/images/id_cards/sayge_id_card_back.svg
 
   fonts:
     - family: PlusJakartaSans

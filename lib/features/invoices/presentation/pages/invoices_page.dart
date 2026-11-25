@@ -364,10 +364,7 @@ class _InvoiceListState extends State<_InvoiceList> {
 }
 
 class _InvoiceRowActions extends StatelessWidget {
-  const _InvoiceRowActions({
-    required this.invoice,
-    required this.compact,
-  });
+  const _InvoiceRowActions({required this.invoice, required this.compact});
 
   final Invoice invoice;
   final bool compact;
@@ -666,7 +663,11 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
       totalAmount: tax.total,
       amountInWords: InvoiceCalculator.amountInWords(tax.total),
       paymentStatus: _paymentStatus,
-      amountPaid: double.tryParse(_amountPaid.text.trim()) ?? 0,
+      amountPaid: _paymentStatus == InvoicePaymentStatus.paid
+          ? tax.total
+          : _paymentStatus == InvoicePaymentStatus.partial
+          ? (double.tryParse(_amountPaid.text.trim()) ?? 0)
+          : 0,
       dueDate: _dueDate,
       paidAt: _paidAt,
     );
@@ -675,7 +676,12 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
   Future<void> _submit() async {
     if (!await ensureBillingWritable(context)) return;
     if (!mounted) return;
-    final paid = double.tryParse(_amountPaid.text.trim()) ?? 0;
+    final draft = _draftInvoice();
+    final double paid = _paymentStatus == InvoicePaymentStatus.paid
+        ? draft.totalAmount.toDouble()
+        : _paymentStatus == InvoicePaymentStatus.partial
+        ? (double.tryParse(_amountPaid.text.trim()) ?? 0)
+        : 0;
     context.read<InvoicesBloc>().add(
       InvoiceSubmitted(
         invoiceNo: _invoiceNo.text,
@@ -736,6 +742,41 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
     });
   }
 
+  EmployeePurchaseOrder? _selectedPo(
+    List<EmployeePurchaseOrder> purchaseOrders,
+  ) {
+    final number = _poNumber.text.trim().toLowerCase();
+    if (number.isEmpty) return null;
+    for (final po in purchaseOrders) {
+      if (po.poNumber.trim().toLowerCase() == number) return po;
+    }
+    return null;
+  }
+
+  String? _poLineMismatch(
+    List<EmployeePurchaseOrder> purchaseOrders,
+    List<Employee> employees,
+  ) {
+    final po = _selectedPo(purchaseOrders);
+    if (po == null) return null;
+    Employee? employee;
+    for (final item in employees) {
+      if (item.employeeId == po.employeeId) {
+        employee = item;
+        break;
+      }
+    }
+    final name = employee?.employeeName.trim() ?? '';
+    if (name.isEmpty) return null;
+    final expected = name.toLowerCase();
+    final matches = _lines.any(
+      (line) => line.particulars.text.toLowerCase().contains(expected),
+    );
+    if (matches) return null;
+    return 'PO ${po.poNumber} is assigned to $name (${po.employeeId}). '
+        'The selected line item does not match this employee.';
+  }
+
   List<Employee> _candidates(List<Employee> employees) {
     final client = _selectedClient;
     if (client == null) {
@@ -759,6 +800,7 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
     final pos = widget.state.purchaseOrders;
     final candidates = _candidates(employees);
     final draft = _draftInvoice();
+    final poMismatch = _poLineMismatch(pos, employees);
 
     return PopScope(
       canPop: false,
@@ -884,34 +926,66 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
                               );
                             },
                     ),
-                    AppTextField(
-                      label: 'P.O. Number',
-                      controller: _poNumber,
-                      enabled: !saving,
-                      hintText: 'Type or pick from list',
-                      suffixIcon: pos.isEmpty
-                          ? null
-                          : PopupMenuButton<EmployeePurchaseOrder>(
-                              tooltip: 'Select PO',
-                              icon: const Icon(
-                                Icons.arrow_drop_down_rounded,
-                                color: AppColors.textLight,
-                              ),
-                              onSelected: _applyPo,
-                              itemBuilder: (context) => [
-                                for (final po in pos)
-                                  PopupMenuItem(
-                                    value: po,
-                                    enabled: po.coversDate(_invoiceDate),
-                                    child: Text(
-                                      po.coversDate(_invoiceDate)
-                                          ? '${po.poNumber} (${po.employeeId})'
-                                          : '${po.poNumber} · expired '
-                                                '${AppDates.compact.format(po.endDate)}',
-                                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppTextField(
+                          label: 'P.O. Number',
+                          controller: _poNumber,
+                          enabled: !saving,
+                          hintText: 'Type or pick from list',
+                          onChanged: (_) => setState(() {}),
+                          suffixIcon: pos.isEmpty
+                              ? null
+                              : PopupMenuButton<EmployeePurchaseOrder>(
+                                  tooltip: 'Select PO',
+                                  icon: const Icon(
+                                    Icons.arrow_drop_down_rounded,
+                                    color: AppColors.textLight,
                                   ),
-                              ],
+                                  onSelected: _applyPo,
+                                  itemBuilder: (context) => [
+                                    for (final po in pos)
+                                      () {
+                                        Employee? employee;
+                                        for (final item in employees) {
+                                          if (item.employeeId ==
+                                              po.employeeId) {
+                                            employee = item;
+                                            break;
+                                          }
+                                        }
+                                        final person =
+                                            employee?.employeeName ??
+                                            'Employee ${po.employeeId}';
+                                        final end = AppDates.compact.format(
+                                          po.endDate,
+                                        );
+                                        return PopupMenuItem(
+                                          value: po,
+                                          enabled: po.coversDate(_invoiceDate),
+                                          child: Text(
+                                            po.coversDate(_invoiceDate)
+                                                ? '${po.poNumber} · $person (${po.employeeId}) · ends $end'
+                                                : '${po.poNumber} · $person · expired $end',
+                                          ),
+                                        );
+                                      }(),
+                                  ],
+                                ),
+                        ),
+                        if (poMismatch != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            poMismatch,
+                            style: const TextStyle(
+                              color: AppColors.error,
+                              fontSize: 10,
+                              height: 1.25,
                             ),
+                          ),
+                        ],
+                      ],
                     ),
                     AppTextField(
                       label: 'Place of Supply',
@@ -1043,18 +1117,27 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
                         });
                       },
                     ),
-                    AppTextField(
-                      label: 'Amount paid',
-                      controller: _amountPaid,
-                      enabled: !saving,
-                      prefixText: AppDisplayConfig.currencySymbol,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                    if (_paymentStatus == InvoicePaymentStatus.partial)
+                      AppTextField(
+                        label: 'Amount received',
+                        controller: _amountPaid,
+                        enabled: !saving,
+                        prefixText: AppDisplayConfig.currencySymbol,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                        ],
+                      )
+                    else if (_paymentStatus == InvoicePaymentStatus.paid)
+                      Text(
+                        'Paid in full · ${MoneyFormat.format(draft.totalAmount)}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                      ],
-                    ),
                     AppTextField(
                       label: 'Due date',
                       controller: _dueDateCtrl,

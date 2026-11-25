@@ -166,10 +166,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       throw const ServerException('Expense not found.');
     }
     final current = ExpenseModel.fromJson(existing);
-    if (current.approvalStatus != ExpenseApprovalStatus.pending) {
-      throw const ServerException('Only pending expenses can be edited.');
-    }
-
     final user = _authSession?.user;
     final uid = _client.auth.currentUser?.id ?? user?.id;
     final isStaff = AppAccess.isStaff(user);
@@ -328,10 +324,22 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       throw const ServerException('Expense id is required.');
     }
     if (status == ExpenseApprovalStatus.pending) {
-      throw const ServerException('Choose approved or rejected.');
+      throw const ServerException('Choose approved, rejected, or paid.');
     }
 
     try {
+      if (status == ExpenseApprovalStatus.paid) {
+        final existing = await _client
+            .from(_table)
+            .select('approval_status')
+            .eq('id', id)
+            .maybeSingle();
+        if (existing == null || existing['approval_status'] != 'approved') {
+          throw const ServerException(
+            'Only an approved expense can be marked as paid.',
+          );
+        }
+      }
       final row = await _client
           .from(_table)
           .update({

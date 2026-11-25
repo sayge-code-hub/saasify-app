@@ -25,6 +25,18 @@ class EmployeePurchaseOrder extends Equatable {
 
   bool get hasFile => storagePath.trim().isNotEmpty;
 
+  int get daysUntilEnd {
+    final today = DateTime.now();
+    final day = DateTime(today.year, today.month, today.day);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    return end.difference(day).inDays;
+  }
+
+  bool get isExpired => daysUntilEnd < 0;
+
+  /// POs ending within the next month should be renewed before invoicing.
+  bool get needsRenewal => !isExpired && daysUntilEnd <= 30;
+
   /// Inclusive coverage: invoice/service date must fall in [startDate, endDate].
   bool coversDate(DateTime date) {
     final day = DateTime(date.year, date.month, date.day);
@@ -35,12 +47,12 @@ class EmployeePurchaseOrder extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        employeeId,
-        poNumber,
-        startDate,
-        endDate,
-        fileName,
-        storagePath,
-      ];
+    id,
+    employeeId,
+    poNumber,
+    startDate,
+    endDate,
+    fileName,
+    storagePath,
+  ];
 }

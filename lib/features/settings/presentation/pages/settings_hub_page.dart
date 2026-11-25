@@ -7,8 +7,21 @@ import '../../../../core/router/app_routes.dart';
 import '../../../../core/widgets/app_hub_tile.dart';
 import '../../../../injection_container.dart';
 
-class SettingsHubPage extends StatelessWidget {
+class SettingsHubPage extends StatefulWidget {
   const SettingsHubPage({super.key});
+
+  @override
+  State<SettingsHubPage> createState() => _SettingsHubPageState();
+}
+
+class _SettingsHubPageState extends State<SettingsHubPage> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +65,7 @@ class SettingsHubPage extends StatelessWidget {
         path: AppRoutes.ledger,
       ),
       _SettingsTileData(
-        title: 'Categories',
+        title: 'POS Categories',
         icon: Icons.category_outlined,
         path: AppRoutes.categories,
       ),
@@ -63,6 +76,23 @@ class SettingsHubPage extends StatelessWidget {
       ),
     ];
 
+    final query = _search.text.trim().toLowerCase();
+    final tiles =
+        [
+              ...standardTiles,
+              if (showModuleControls)
+                const _SettingsTileData(
+                  title: 'Product modules',
+                  icon: Icons.tune_outlined,
+                  path: AppRoutes.platformModules,
+                ),
+            ]
+            .where(
+              (tile) =>
+                  query.isEmpty || tile.title.toLowerCase().contains(query),
+            )
+            .toList();
+
     return Padding(
       padding: EdgeInsets.fromLTRB(
         isDesktop ? 32 : 16,
@@ -70,34 +100,77 @@ class SettingsHubPage extends StatelessWidget {
         isDesktop ? 32 : 16,
         isDesktop ? 32 : 16,
       ),
-      child: Align(
-        alignment: Alignment.topLeft,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1180),
-          child: GridView.builder(
-            shrinkWrap: true,
-            itemCount: standardTiles.length + (showModuleControls ? 1 : 0),
-            gridDelegate: AppHubGrid.delegate(
-              isDesktop: isDesktop,
-              hasSubtitle: false,
-              columns: 4,
-            ),
-            itemBuilder: (context, index) {
-              final tile = index < standardTiles.length
-                  ? standardTiles[index]
-                  : const _SettingsTileData(
-                      title: 'Product modules',
-                      icon: Icons.tune_outlined,
-                      path: AppRoutes.platformModules,
-                    );
-              return AppHubTile(
-                title: tile.title,
-                icon: tile.icon,
-                onTap: () => context.go(tile.path),
-              );
-            },
+      child: ListView(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Settings',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontSize: isDesktop ? 28 : 24,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: isDesktop ? 320 : 180,
+                child: Material(
+                  color: Colors.transparent,
+                  child: TextField(
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Search settings',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
+          const SizedBox(height: 20),
+          if (tiles.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 80),
+              child: Center(
+                child: Text(
+                  'No settings match your search.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: tiles.length,
+              gridDelegate: AppHubGrid.delegate(
+                isDesktop: isDesktop,
+                hasSubtitle: false,
+                columns: 4,
+              ),
+              itemBuilder: (context, index) {
+                final tile = tiles[index];
+                return AppHubTile(
+                  title: tile.title,
+                  icon: tile.icon,
+                  onTap: () => context.go(tile.path),
+                );
+              },
+            ),
+        ],
       ),
     );
   }

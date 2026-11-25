@@ -116,6 +116,10 @@ class _HomeShellState extends State<HomeShell> {
                 icon: Icons.account_balance_outlined,
                 iconAsset: 'assets/images/nav_expense.png',
               ),
+              AppNavItem(
+                label: 'Purchase Orders',
+                icon: Icons.description_outlined,
+              ),
             ],
           ),
         if (_modules.isEnabled(SaasifyModule.pos) && _billing.posEnabled)
@@ -171,6 +175,14 @@ class _HomeShellState extends State<HomeShell> {
           enabled: linked,
           items: const [],
         ),
+      if (_modules.isEnabled(SaasifyModule.dms))
+        AppNavSection(
+          label: 'DMS',
+          icon: Icons.folder_outlined,
+          selectable: linked,
+          enabled: linked,
+          items: const [],
+        ),
     ];
   }
 
@@ -186,6 +198,8 @@ class _HomeShellState extends State<HomeShell> {
         if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.proposals,
         if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.invoices,
         if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.expenses,
+        if (_modules.isEnabled(SaasifyModule.finances))
+          AppRoutes.purchaseOrders,
         if (_modules.isEnabled(SaasifyModule.pos) && _billing.posEnabled)
           AppRoutes.pos,
         AppRoutes.settings,
@@ -208,6 +222,7 @@ class _HomeShellState extends State<HomeShell> {
       if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.dashboard,
       if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.dashboardSlips,
       if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.employeeIdCard,
+      if (_modules.isEnabled(SaasifyModule.dms)) AppRoutes.employeeDocuments,
     ];
   }
 
@@ -225,6 +240,9 @@ class _HomeShellState extends State<HomeShell> {
       if (location.startsWith(AppRoutes.employeeIdCard)) {
         return paths.indexOf(AppRoutes.employeeIdCard);
       }
+      if (location.startsWith(AppRoutes.employeeDocuments)) {
+        return paths.indexOf(AppRoutes.employeeDocuments);
+      }
       if (location.contains('section=slips')) {
         return paths.indexOf(AppRoutes.dashboardSlips);
       }
@@ -241,6 +259,9 @@ class _HomeShellState extends State<HomeShell> {
     }
     if (location.startsWith(AppRoutes.expenses)) {
       return paths.indexOf(AppRoutes.expenses);
+    }
+    if (location.startsWith(AppRoutes.purchaseOrders)) {
+      return paths.indexOf(AppRoutes.purchaseOrders);
     }
     if (location.startsWith(AppRoutes.invoices)) {
       return paths.indexOf(AppRoutes.invoices);
@@ -280,6 +301,7 @@ class _HomeShellState extends State<HomeShell> {
       return 'Dashboard';
     }
     if (path == AppRoutes.employeeIdCard) return 'My ID Card';
+    if (path == AppRoutes.employeeDocuments) return 'DMS';
     if (path == AppRoutes.myDetails) return 'Dashboard';
     if (path == AppRoutes.employeesAdd) return 'Add employee';
     if (path.endsWith('/edit') && path.startsWith('/hrms/employees/')) {
@@ -307,10 +329,12 @@ class _HomeShellState extends State<HomeShell> {
     if (path == AppRoutes.ledger) return 'Activity ledger';
     if (path == AppRoutes.theme) return 'Theme';
     if (path == AppRoutes.categories) return 'Categories';
-    if (path == AppRoutes.settings) return 'Settings';
+    // Settings renders its own heading so the search field can share the row.
+    if (path == AppRoutes.settings) return '';
     // Cafe POS: no chrome title — page headers live in the body; brand is the tab title.
     if (path.startsWith(AppRoutes.pos)) return '';
     if (path.startsWith(AppRoutes.expenses)) return 'Expense';
+    if (path.startsWith(AppRoutes.purchaseOrders)) return 'Purchase Orders';
     if (path.startsWith(AppRoutes.invoices)) return 'Invoices';
     if (path.startsWith(AppRoutes.proposals)) return 'Proposals';
     if (path.endsWith('/projections') && path.startsWith('/profitability/')) {

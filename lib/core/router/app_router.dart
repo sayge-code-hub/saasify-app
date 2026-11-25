@@ -7,6 +7,7 @@ import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/google_onboarding_page.dart';
 import '../../features/auth/presentation/pages/set_password_page.dart';
 import '../../features/auth/presentation/pages/signup_page.dart';
+import '../../features/auth/presentation/pages/subscription_required_page.dart';
 import '../../features/dms/presentation/pages/dms_page.dart';
 import '../../features/hrms/domain/entities/employee.dart';
 import '../../features/hrms/presentation/bloc/employees/employees_bloc.dart';
@@ -16,6 +17,7 @@ import '../../features/hrms/presentation/pages/employee_detail_page.dart';
 import '../../features/hrms/presentation/pages/employees_page.dart';
 import '../../features/hrms/presentation/pages/hrms_overview_page.dart';
 import '../../features/hrms/presentation/pages/my_details_page.dart';
+import '../../features/hrms/presentation/pages/purchase_orders_page.dart';
 import '../../features/modules/presentation/pages/employee_dashboard_page.dart';
 import '../../features/modules/presentation/pages/home_shell.dart';
 import '../../features/expenses/presentation/pages/expenses_page.dart';
@@ -124,7 +126,7 @@ bool _isGuestMenuPath(String location) {
 GoRouter createAppRouter(AuthSession authSession) {
   return GoRouter(
     initialLocation: AppRoutes.login,
-    refreshListenable: authSession,
+    refreshListenable: Listenable.merge([authSession, sl<BillingAccess>()]),
     onException: (_, GoRouterState state, GoRouter router) {
       // Invite links: …/set-password#sb… must never surface as /sb 404.
       if (_isGuestMenuPath(state.uri.path) ||
@@ -184,6 +186,17 @@ GoRouter createAppRouter(AuthSession authSession) {
       if (loggedIn && user != null && !authSession.needsPasswordSetup) {
         final home = AppAccess.homeRoute(user);
         if (loggingIn || signingUp || atRoot) return home;
+        final billing = sl<BillingAccess>();
+        if (billing.accessEnforced && !billing.accessAllowed) {
+          // A staff member must retain access to Billing to mark a period paid
+          // or turn the future gate off. Everyone else sees no app data.
+          if (AppAccess.isStaff(user)) {
+            return location == AppRoutes.billing ? null : AppRoutes.billing;
+          }
+          return location == AppRoutes.subscriptionRequired
+              ? null
+              : AppRoutes.subscriptionRequired;
+        }
         if (!AppAccess.canAccessPath(user, location)) return home;
         // Cafe POS add-on flag (closed beta; no pricing UI).
         final onPos =
@@ -221,6 +234,11 @@ GoRouter createAppRouter(AuthSession authSession) {
         path: AppRoutes.googleOnboarding,
         pageBuilder: (context, state) =>
             _page(state, const GoogleOnboardingPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.subscriptionRequired,
+        pageBuilder: (context, state) =>
+            _page(state, const SubscriptionRequiredPage()),
       ),
       GoRoute(
         path: AppRoutes.setPassword,
@@ -272,6 +290,11 @@ GoRouter createAppRouter(AuthSession authSession) {
             path: AppRoutes.employeeIdCard,
             pageBuilder: (context, state) =>
                 _page(state, const EmployeeDashboardPage(showIdCard: true)),
+          ),
+          GoRoute(
+            path: AppRoutes.employeeDocuments,
+            pageBuilder: (context, state) =>
+                _page(state, const EmployeeDashboardPage(showDocuments: true)),
           ),
           GoRoute(
             path: AppRoutes.hrms,
@@ -447,6 +470,11 @@ GoRouter createAppRouter(AuthSession authSession) {
           GoRoute(
             path: AppRoutes.expenses,
             pageBuilder: (context, state) => _page(state, const ExpensesPage()),
+          ),
+          GoRoute(
+            path: AppRoutes.purchaseOrders,
+            pageBuilder: (context, state) =>
+                _page(state, const PurchaseOrdersPage()),
           ),
           // Cafe POS — cafe-scoped menu / terminal / kitchen / reports.
           GoRoute(

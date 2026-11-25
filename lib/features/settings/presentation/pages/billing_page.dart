@@ -212,7 +212,7 @@ class _BillingPageState extends State<BillingPage> {
                               ),
                             ),
                           const SizedBox(height: 20),
-                          _SectionTitle('Grace & Cafe POS'),
+                          _SectionTitle('Access & Cafe POS'),
                           const SizedBox(height: 8),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -268,6 +268,25 @@ class _BillingPageState extends State<BillingPage> {
                                 .textTheme
                                 .bodySmall
                                 ?.copyWith(color: AppColors.textLight),
+                          ),
+                          const SizedBox(height: 12),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Require an active subscription'),
+                            subtitle: Text(
+                              state.snapshot.accessEnforced
+                                  ? 'Enabled — users without an active subscription are blocked from product screens.'
+                                  : 'Off for the pilot — all invited users can continue using the app.',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textLight,
+                                  ),
+                            ),
+                            value: state.snapshot.accessEnforced,
+                            onChanged: _busy
+                                ? null
+                                : (v) => _run(
+                                      () => _remote.setAccessEnforced(v),
+                                    ),
                           ),
                           const SizedBox(height: 20),
                           _SectionTitle('Offers'),

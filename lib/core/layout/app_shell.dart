@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 
 import '../../features/auth/domain/entities/user.dart';
 import '../../features/auth/domain/usecases/update_avatar_usecase.dart';
+import '../../features/settings/domain/entities/settings_entities.dart';
+import '../../features/settings/domain/usecases/settings_usecases.dart';
 import '../../injection_container.dart';
 import '../auth/auth_session.dart';
+import '../branding/company_branding.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_message_dialog.dart';
 import '../widgets/app_version_label.dart';
@@ -39,6 +42,7 @@ class AppShell extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final Widget body;
+
   /// When set, shows a leading back control in the content header / app bar.
   final VoidCallback? onBack;
   final VoidCallback? onLogout;
@@ -193,10 +197,7 @@ class _MobileShell extends StatelessWidget {
         titleSpacing: onBack == null ? 0 : NavigationToolbar.kMiddleSpacing,
         title: title.isEmpty
             ? null
-            : Text(
-                title,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+            : Text(title, style: Theme.of(context).textTheme.titleLarge),
         leading: onBack == null
             ? null
             : IconButton(
@@ -204,10 +205,7 @@ class _MobileShell extends StatelessWidget {
                 icon: const Icon(Icons.arrow_back),
                 onPressed: onBack,
               ),
-        actions: [
-          ...?actions,
-          const SizedBox(width: 8),
-        ],
+        actions: [...?actions, const SizedBox(width: 8)],
       ),
       drawer: Drawer(
         backgroundColor: AppColors.surfaceMuted,
@@ -231,11 +229,7 @@ class _MobileShell extends StatelessWidget {
 }
 
 class _DesktopHeader extends StatelessWidget {
-  const _DesktopHeader({
-    required this.title,
-    this.onBack,
-    this.actions,
-  });
+  const _DesktopHeader({required this.title, this.onBack, this.actions});
 
   final String title;
   final VoidCallback? onBack;
@@ -253,10 +247,7 @@ class _DesktopHeader extends StatelessWidget {
               tooltip: 'Back',
               onPressed: onBack,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(
-                minWidth: 40,
-                minHeight: 40,
-              ),
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               icon: const Icon(
                 Icons.arrow_back,
                 size: 22,
@@ -271,9 +262,9 @@ class _DesktopHeader extends StatelessWidget {
                 ? const SizedBox.shrink()
                 : Text(
                     title,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontSize: 26,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineMedium?.copyWith(fontSize: 26),
                   ),
           ),
           if (actions != null && actions!.isNotEmpty) ...actions!,
@@ -376,32 +367,28 @@ class _SidebarState extends State<_Sidebar> {
       width: widget.compact ? 248 : null,
       decoration: const BoxDecoration(
         color: AppColors.surfaceMuted,
-        border: Border(
-          right: BorderSide(
-            color: AppColors.border,
-            width: 1,
-          ),
-        ),
+        border: Border(right: BorderSide(color: AppColors.border, width: 1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const KeptMaterialIcons(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Image.asset(
-                'assets/images/sayge_logo.webp',
-                height: 30,
-                semanticLabel: 'Sayge',
-              ),
+          Container(
+            color: AppColors.background,
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                KeptMaterialIcons(),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _CompanyBrandMark(),
+                  ),
+                ),
+              ],
             ),
           ),
-          const Divider(
-            height: 1,
-            color: AppColors.border,
-          ),
+          const Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 12),
           Expanded(
             child: ListView(
@@ -423,17 +410,19 @@ class _SidebarState extends State<_Sidebar> {
                         size: 18,
                         color: AppColors.textLight,
                       ),
-                      onTap: widget.onLogout,
+                      onTap: () async {
+                        final confirmed = await confirmLogout(context);
+                        if (confirmed && context.mounted) {
+                          widget.onLogout?.call();
+                        }
+                      },
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          const Divider(
-            height: 1,
-            color: AppColors.border,
-          ),
+          const Divider(height: 1, color: AppColors.border),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
             child: const AppVersionLabel(
@@ -480,10 +469,10 @@ class _SidebarState extends State<_Sidebar> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              fontSize: 13,
-                              height: 1.2,
-                              color: AppColors.text,
-                            ),
+                          fontSize: 13,
+                          height: 1.2,
+                          color: AppColors.text,
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -491,10 +480,10 @@ class _SidebarState extends State<_Sidebar> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontSize: 12,
-                              height: 1.2,
-                              color: AppColors.textLight,
-                            ),
+                          fontSize: 12,
+                          height: 1.2,
+                          color: AppColors.textLight,
+                        ),
                       ),
                     ],
                   ),
@@ -571,12 +560,8 @@ class _SidebarState extends State<_Sidebar> {
                     ),
                   )
                 : section.icon != null
-                    ? Icon(
-                        section.icon,
-                        size: 18,
-                        color: sectionIconColor,
-                      )
-                    : null,
+                ? Icon(section.icon, size: 18, color: sectionIconColor)
+                : null,
             trailing: hasChildren
                 ? Icon(
                     expanded
@@ -623,8 +608,9 @@ class _SidebarState extends State<_Sidebar> {
             );
             continue;
           }
-          final iconColor =
-              selected ? AppColors.highlight : AppColors.textLight;
+          final iconColor = selected
+              ? AppColors.highlight
+              : AppColors.textLight;
           widgets.add(
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 2),
@@ -641,12 +627,8 @@ class _SidebarState extends State<_Sidebar> {
                         colorBlendMode: BlendMode.srcIn,
                       )
                     : item.icon != null
-                        ? Icon(
-                            item.icon,
-                            size: 18,
-                            color: iconColor,
-                          )
-                        : null,
+                    ? Icon(item.icon, size: 18, color: iconColor)
+                    : null,
                 onTap: () => widget.onDestinationSelected(index),
                 indent: true,
               ),
@@ -686,10 +668,7 @@ class _SidebarState extends State<_Sidebar> {
       (user) async {
         await sl<AuthSession>().setUser(user);
         if (!mounted) return;
-        await showAppMessageDialog(
-          context,
-          message: 'Profile picture updated',
-        );
+        await showAppMessageDialog(context, message: 'Profile picture updated');
       },
     );
   }
@@ -715,11 +694,124 @@ class _SidebarState extends State<_Sidebar> {
   }
 }
 
+class _CompanyBrandMark extends StatefulWidget {
+  const _CompanyBrandMark();
+
+  @override
+  State<_CompanyBrandMark> createState() => _CompanyBrandMarkState();
+}
+
+class _CompanyBrandMarkState extends State<_CompanyBrandMark> {
+  late Future<CompanyDetails?> _company;
+
+  @override
+  void initState() {
+    super.initState();
+    _company = _loadCompany();
+    CompanyBranding.revision.addListener(_reload);
+  }
+
+  @override
+  void dispose() {
+    CompanyBranding.revision.removeListener(_reload);
+    super.dispose();
+  }
+
+  Future<CompanyDetails?> _loadCompany() async {
+    final result = await sl<GetCompanyDetailsUseCase>()();
+    return result.fold((_) => null, (details) => details);
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    setState(() => _company = _loadCompany());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<CompanyDetails?>(
+      future: _company,
+      builder: (context, snapshot) {
+        final company = snapshot.data;
+        final logoUrl = company?.logoUrl?.trim() ?? '';
+        final displayName = company?.displayName.trim().isNotEmpty == true
+            ? company!.displayName.trim()
+            : company?.name.trim() ?? 'Sayge';
+
+        if (logoUrl.isNotEmpty) {
+          return SizedBox(
+            width: 188,
+            height: 42,
+            child: Image.network(
+              logoUrl,
+              fit: BoxFit.contain,
+              alignment: Alignment.centerLeft,
+              semanticLabel: displayName,
+              errorBuilder: (_, _, _) => _DefaultBrandMark(name: displayName),
+            ),
+          );
+        }
+        return _DefaultBrandMark(name: displayName);
+      },
+    );
+  }
+}
+
+class _DefaultBrandMark extends StatelessWidget {
+  const _DefaultBrandMark({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    if (name.toLowerCase() == 'sayge') {
+      return Image.asset(
+        'assets/images/sayge_logo.webp',
+        height: 34,
+        semanticLabel: 'Sayge',
+      );
+    }
+    return SizedBox(
+      height: 42,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.text,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              name.substring(0, 1).toUpperCase(),
+              style: const TextStyle(
+                color: AppColors.background,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 9),
+          Flexible(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.text,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({
-    required this.user,
-    required this.radius,
-  });
+  const _ProfileAvatar({required this.user, required this.radius});
 
   final User user;
   final double radius;
@@ -743,9 +835,9 @@ class _ProfileAvatar extends StatelessWidget {
       child: url.isEmpty
           ? Text(
               initials,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontSize: radius * 0.67,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontSize: radius * 0.67),
             )
           : null,
     );
@@ -798,18 +890,15 @@ class _NavTile extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(indent ? 28 : 12, 11, 12, 11),
           child: Row(
             children: [
-              if (leading != null) ...[
-                leading!,
-                const SizedBox(width: 10),
-              ],
+              if (leading != null) ...[leading!, const SizedBox(width: 10)],
               Expanded(
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w400,
-                        color: textColor,
-                      ),
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w400,
+                    color: textColor,
+                  ),
                 ),
               ),
               ?trailing,

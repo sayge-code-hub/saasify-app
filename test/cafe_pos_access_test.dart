@@ -97,6 +97,10 @@ void main() {
         AppAccess.canAccessPath(employee, AppRoutes.employeeIdCard),
         isTrue,
       );
+      expect(
+        AppAccess.canAccessPath(employee, AppRoutes.employeeDocuments),
+        isTrue,
+      );
       expect(AppAccess.canAccessPath(employee, AppRoutes.myDetails), isTrue);
       expect(
         AppAccess.canAccessPath(employee, AppRoutes.dashboardSlips),
