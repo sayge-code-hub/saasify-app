@@ -27,7 +27,7 @@ dependencies:
   pdf: ^3.13.1
   printing: ^5.15.1
   file_picker: ^13.1.0
-  shared_preferences: ^2.5.5
+  shared_preferences: ^2.5.6
   flutter_svg: ^2.2.4
   qr_flutter: ^4.1.0
   image_cropper: ^14.0.0
