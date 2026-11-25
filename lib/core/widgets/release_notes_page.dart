@@ -60,13 +60,13 @@ class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
                       Expanded(
                         child: Text(
                           'Release notes',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 20,
-                                    letterSpacing: -0.4,
-                                    color: AppColors.text,
-                                  ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 20,
+                                letterSpacing: -0.4,
+                                color: AppColors.text,
+                              ),
                         ),
                       ),
                       if (running.isNotEmpty)
@@ -79,8 +79,9 @@ class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
                             color: AppColors.highlight.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color:
-                                  AppColors.highlight.withValues(alpha: 0.28),
+                              color: AppColors.highlight.withValues(
+                                alpha: 0.28,
+                              ),
                             ),
                           ),
                           child: Text(
@@ -102,29 +103,37 @@ class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
                     'Sayge ships with three-part semver (vMAJOR.MINOR.PATCH). '
                     'Each production deploy bumps the patch automatically.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textLight,
-                          height: 1.45,
-                          fontSize: 13,
-                        ),
+                      color: AppColors.textLight,
+                      height: 1.45,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
                 const Divider(height: 1, color: AppColors.border),
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                    itemCount: notes.length,
-                    itemBuilder: (context, index) {
-                      final note = notes[index];
-                      final isCurrent = running.isNotEmpty &&
-                          note.version == running;
-                      return _ReleaseCard(
-                        note: note,
-                        isCurrent: isCurrent,
-                        isFirst: index == 0,
-                        isLast: index == notes.length - 1,
-                      );
-                    },
-                  ),
+                  child: notes.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No release notes published yet.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: AppColors.textLight),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                          itemCount: notes.length,
+                          itemBuilder: (context, index) {
+                            final note = notes[index];
+                            final isCurrent =
+                                running.isNotEmpty && note.version == running;
+                            return _ReleaseCard(
+                              note: note,
+                              isCurrent: isCurrent,
+                              isFirst: index == 0,
+                              isLast: index == notes.length - 1,
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -150,9 +159,9 @@ class _ReleaseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stamp = DateFormat('d MMM yyyy · HH:mm').format(
-      note.releasedAt.toLocal(),
-    );
+    final stamp = DateFormat(
+      'd MMM yyyy · HH:mm',
+    ).format(note.releasedAt.toLocal());
 
     return IntrinsicHeight(
       child: Row(
@@ -171,15 +180,13 @@ class _ReleaseCard extends StatelessWidget {
                     color: isCurrent
                         ? AppColors.highlight
                         : AppColors.textLight.withValues(alpha: 0.45),
-                    border: Border.all(
-                      color: AppColors.background,
-                      width: 2,
-                    ),
+                    border: Border.all(color: AppColors.background, width: 2),
                     boxShadow: isCurrent
                         ? [
                             BoxShadow(
-                              color:
-                                  AppColors.highlight.withValues(alpha: 0.35),
+                              color: AppColors.highlight.withValues(
+                                alpha: 0.35,
+                              ),
                               blurRadius: 6,
                             ),
                           ]
@@ -190,9 +197,7 @@ class _ReleaseCard extends StatelessWidget {
                   child: Container(
                     width: 2,
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: isLast
-                        ? Colors.transparent
-                        : AppColors.border,
+                    color: isLast ? Colors.transparent : AppColors.border,
                   ),
                 ),
               ],
@@ -289,8 +294,9 @@ class _ReleaseCard extends StatelessWidget {
                               width: 4,
                               height: 4,
                               decoration: BoxDecoration(
-                                color: AppColors.highlight
-                                    .withValues(alpha: 0.85),
+                                color: AppColors.highlight.withValues(
+                                  alpha: 0.85,
+                                ),
                                 shape: BoxShape.circle,
                               ),
                             ),
