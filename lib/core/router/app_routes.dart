@@ -13,6 +13,9 @@ abstract final class AppRoutes {
   /// Dashboard focused on salary slip download.
   static const dashboardSlips = '/dashboard?section=slips';
 
+  /// Employee self-service identity card.
+  static const employeeIdCard = '/dashboard/id-card';
+
   /// Employee self-service landing when no `employee_id` is linked yet.
   static const myDetails = '/hrms/me';
   static const employees = '/hrms/employees';

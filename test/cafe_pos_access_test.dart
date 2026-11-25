@@ -7,6 +7,7 @@ import 'package:sayge_app/features/pos/domain/entities/cafe_entities.dart';
 User _user({
   required String roleCode,
   String? cafeId,
+  String? employeeId,
   String roleId = 'role_x',
 }) {
   return User(
@@ -17,6 +18,7 @@ User _user({
     roleCode: roleCode,
     roleLabel: roleCode,
     cafeId: cafeId,
+    employeeId: employeeId,
   );
 }
 
@@ -83,6 +85,42 @@ void main() {
         CafePaymentMethod.upi,
         CafePaymentMethod.cash,
       ]);
+    });
+  });
+
+  group('Employee self-service access', () {
+    final employee = _user(roleCode: 'employee', employeeId: 'EMP-001');
+
+    test('allows only the employee self-service routes', () {
+      expect(AppAccess.canAccessPath(employee, AppRoutes.dashboard), isTrue);
+      expect(
+        AppAccess.canAccessPath(employee, AppRoutes.employeeIdCard),
+        isTrue,
+      );
+      expect(AppAccess.canAccessPath(employee, AppRoutes.myDetails), isTrue);
+      expect(
+        AppAccess.canAccessPath(employee, AppRoutes.dashboardSlips),
+        isTrue,
+      );
+    });
+
+    test('blocks commercial and finance routes', () {
+      expect(
+        AppAccess.canAccessPath(
+          employee,
+          AppRoutes.employeeCompensation('EMP-001'),
+        ),
+        isFalse,
+      );
+      expect(AppAccess.canAccessPath(employee, AppRoutes.expenses), isFalse);
+      expect(AppAccess.canAccessPath(employee, AppRoutes.payroll), isFalse);
+      expect(
+        AppAccess.canAccessPath(employee, AppRoutes.profitability),
+        isFalse,
+      );
+      expect(AppAccess.canAccessPath(employee, AppRoutes.proposals), isFalse);
+      expect(AppAccess.canAccessPath(employee, AppRoutes.invoices), isFalse);
+      expect(AppAccess.canAccessPath(employee, AppRoutes.dms), isFalse);
     });
   });
 }

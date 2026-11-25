@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/layout/breakpoints.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -17,35 +19,37 @@ import '../../../hrms/domain/usecases/update_employee.dart';
 import '../../../hrms/presentation/bloc/employees/employees_bloc.dart';
 import '../../../hrms/presentation/widgets/employee_avatar.dart';
 import '../../../hrms/presentation/widgets/employee_documents_section.dart';
-import '../../../hrms/presentation/widgets/employee_purchase_orders_section.dart';
 import '../../../payroll/domain/services/payslip_period.dart';
 import '../../../payroll/presentation/bloc/payroll_bloc.dart';
 
-/// Employee home. Dashboard = profile only; Salary Slips = download only.
+/// Employee self-service: profile, salary slips and a non-sensitive ID card.
 class EmployeeDashboardPage extends StatelessWidget {
   const EmployeeDashboardPage({
     super.key,
     this.showSalarySlips = false,
+    this.showIdCard = false,
   });
 
   final bool showSalarySlips;
+  final bool showIdCard;
 
   @override
   Widget build(BuildContext context) {
-    if (!showSalarySlips) {
-      return const _DashboardBody(isSlips: false);
+    if (showSalarySlips) {
+      return BlocProvider(
+        create: (_) => sl<PayrollBloc>()..add(const PayrollStarted()),
+        child: const _DashboardBody(isSlips: true, isIdCard: false),
+      );
     }
-    return BlocProvider(
-      create: (_) => sl<PayrollBloc>()..add(const PayrollStarted()),
-      child: const _DashboardBody(isSlips: true),
-    );
+    return _DashboardBody(isSlips: false, isIdCard: showIdCard);
   }
 }
 
 class _DashboardBody extends StatelessWidget {
-  const _DashboardBody({required this.isSlips});
+  const _DashboardBody({required this.isSlips, required this.isIdCard});
 
   final bool isSlips;
+  final bool isIdCard;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +77,9 @@ class _DashboardBody extends StatelessWidget {
         if (isSlips) {
           return _SalarySlipsView(employee: me);
         }
+        if (isIdCard) {
+          return _EmployeeIdCardView(employee: me, user: user);
+        }
         return _ProfileView(employee: me, user: user);
       },
     );
@@ -95,8 +102,8 @@ class _ProfileView extends StatelessWidget {
     final displayName = linked
         ? employee!.employeeName
         : (user?.name?.trim().isNotEmpty == true
-            ? user!.name!.trim()
-            : (user?.email ?? 'Profile'));
+              ? user!.name!.trim()
+              : (user?.email ?? 'Profile'));
 
     final fields = linked
         ? <({String label, String value})>[
@@ -144,6 +151,10 @@ class _ProfileView extends StatelessWidget {
                   employeeId: linked ? employee!.employeeId : null,
                   isDesktop: isDesktop,
                 ),
+                if (linked) ...[
+                  const SizedBox(height: 16),
+                  _IdCardShortcut(employee: employee!),
+                ],
                 const SizedBox(height: 16),
                 _DetailsGrid(fields: fields, isDesktop: isDesktop),
                 if (linked) ...[
@@ -156,23 +167,17 @@ class _ProfileView extends StatelessWidget {
                     isDesktop: isDesktop,
                     canUpload: true,
                   ),
-                  const SizedBox(height: 12),
-                  EmployeePurchaseOrdersSection(
-                    employeeId: employee!.employeeId,
-                    isDesktop: isDesktop,
-                    canManage: false,
-                  ),
                 ] else ...[
                   const SizedBox(height: 16),
                   Text(
                     'Your profile is not linked to an employee record yet. '
                     'Ask an owner to link your account, then you can view your '
-                    'details, compensation, and salary slips here.',
+                    'details and salary slips here.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textLight,
-                          height: 1.45,
-                          fontSize: 13,
-                        ),
+                      color: AppColors.textLight,
+                      height: 1.45,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ],
@@ -194,10 +199,10 @@ class _SalarySlipsView extends StatelessWidget {
     final isDesktop = Breakpoints.isDesktop(context);
     final horizontal = isDesktop ? 32.0 : 16.0;
     final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: AppColors.textLight,
-          fontSize: 13,
-          height: 1.45,
-        );
+      color: AppColors.textLight,
+      fontSize: 13,
+      height: 1.45,
+    );
 
     if (employee == null) {
       return Padding(
@@ -218,7 +223,7 @@ class _SalarySlipsView extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(horizontal, 24, horizontal, 32),
         child: Text(
           'No salary slips are available yet. Slips unlock after the month ends.',
-            style: textStyle,
+          style: textStyle,
         ),
       );
     }
@@ -241,6 +246,284 @@ class _SalarySlipsView extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _IdCardShortcut extends StatelessWidget {
+  const _IdCardShortcut({required this.employee});
+
+  final Employee employee;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceMuted,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => context.go(AppRoutes.employeeIdCard),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.badge_outlined, color: AppColors.text),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'My ID Card',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'View your employee identity card',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textLight,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmployeeIdCardView extends StatelessWidget {
+  const _EmployeeIdCardView({this.employee, this.user});
+
+  final Employee? employee;
+  final User? user;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = Breakpoints.isDesktop(context);
+    final horizontal = isDesktop ? 32.0 : 16.0;
+    final employee = this.employee;
+    if (employee == null) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(horizontal, 24, horizontal, 32),
+        child: Text(
+          'Your profile is not linked to an employee record yet.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.textLight),
+        ),
+      );
+    }
+
+    final textTheme = Theme.of(context).textTheme;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          horizontal,
+          isDesktop ? 28 : 20,
+          horizontal,
+          40,
+        ),
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: AppColors.text,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.badge_rounded,
+                            color: AppColors.text,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'SAASIFY',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                        const Text(
+                          'EMPLOYEE ID',
+                          style: TextStyle(
+                            color: Color(0xFFCACACA),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(24),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        EmployeeAvatar(
+                          name: employee.employeeName,
+                          photoUrl: employee.photoUrl,
+                          radius: 38,
+                          fontSize: 22,
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                employee.employeeName,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.text,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                employee.designation.trim().isEmpty
+                                    ? 'Employee'
+                                    : employee.designation,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.textLight,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _IdCardDetail(
+                                label: 'EMPLOYEE ID',
+                                value: employee.employeeId,
+                              ),
+                              const SizedBox(height: 10),
+                              _IdCardDetail(
+                                label: 'DEPARTMENT',
+                                value: employee.department.trim().isEmpty
+                                    ? '—'
+                                    : employee.department,
+                              ),
+                              const SizedBox(height: 10),
+                              _IdCardDetail(
+                                label: 'LOCATION',
+                                value: employee.location.trim().isEmpty
+                                    ? '—'
+                                    : employee.location,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    color: AppColors.surfaceMuted,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
+                    child: Text(
+                      user?.email ?? '',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.textLight,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'This card is for identification only.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodySmall?.copyWith(color: AppColors.textLight),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IdCardDetail extends StatelessWidget {
+  const _IdCardDetail({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textLight,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.7,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.text,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -333,10 +616,7 @@ class _ProfileHero extends StatelessWidget {
 }
 
 class _DetailsGrid extends StatelessWidget {
-  const _DetailsGrid({
-    required this.fields,
-    required this.isDesktop,
-  });
+  const _DetailsGrid({required this.fields, required this.isDesktop});
 
   final List<({String label, String value})> fields;
   final bool isDesktop;
@@ -389,8 +669,7 @@ class _DetailsGrid extends StatelessWidget {
           ? Column(
               children: [
                 for (var i = 0; i < fields.length; i++) ...[
-                  if (i > 0)
-                    const Divider(height: 1, color: AppColors.border),
+                  if (i > 0) const Divider(height: 1, color: AppColors.border),
                   cell(fields[i]),
                 ],
               ],
@@ -398,8 +677,7 @@ class _DetailsGrid extends StatelessWidget {
           : Column(
               children: [
                 for (var i = 0; i < fields.length; i += 2) ...[
-                  if (i > 0)
-                    const Divider(height: 1, color: AppColors.border),
+                  if (i > 0) const Divider(height: 1, color: AppColors.border),
                   IntrinsicHeight(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -443,9 +721,10 @@ class _SalarySlipDownload extends StatelessWidget {
         final generating = state.status == PayrollStatus.generating;
         final options = monthOptions;
         final selected = DateTime(state.year, state.month, 1);
-        final value = options.any(
-          (d) => d.year == selected.year && d.month == selected.month,
-        )
+        final value =
+            options.any(
+              (d) => d.year == selected.year && d.month == selected.month,
+            )
             ? selected
             : options.last;
 
@@ -453,8 +732,8 @@ class _SalarySlipDownload extends StatelessWidget {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!context.mounted) return;
             context.read<PayrollBloc>().add(
-                  PayrollMonthChanged(month: value.month, year: value.year),
-                );
+              PayrollMonthChanged(month: value.month, year: value.year),
+            );
           });
         }
 
@@ -470,11 +749,8 @@ class _SalarySlipDownload extends StatelessWidget {
               onChanged: (picked) {
                 if (picked == null) return;
                 context.read<PayrollBloc>().add(
-                      PayrollMonthChanged(
-                        month: picked.month,
-                        year: picked.year,
-                      ),
-                    );
+                  PayrollMonthChanged(month: picked.month, year: picked.year),
+                );
               },
             ),
             const SizedBox(height: 16),
@@ -485,9 +761,9 @@ class _SalarySlipDownload extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: generating || state.employees.isEmpty
                       ? null
-                      : () => context
-                          .read<PayrollBloc>()
-                          .add(const PayrollDownloadSelected()),
+                      : () => context.read<PayrollBloc>().add(
+                          const PayrollDownloadSelected(),
+                        ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.text,
                     foregroundColor: AppColors.background,
@@ -593,10 +869,7 @@ class _ContactEditCardState extends State<_ContactEditCard> {
       ),
       (_) async {
         context.read<EmployeesBloc>().add(const EmployeesRequested());
-        await showAppMessageDialog(
-          context,
-          message: 'Contact details updated',
-        );
+        await showAppMessageDialog(context, message: 'Contact details updated');
       },
     );
   }

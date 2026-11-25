@@ -93,7 +93,8 @@ abstract final class AppAccess {
     if (isStaff(user)) return true;
 
     if (isCafeRole(user)) {
-      if (location == AppRoutes.pos || location.startsWith('${AppRoutes.pos}/')) {
+      if (location == AppRoutes.pos ||
+          location.startsWith('${AppRoutes.pos}/')) {
         final cafeId = cafeIdOf(user);
         if (cafeId == null) return location == AppRoutes.pos;
         if (location == AppRoutes.pos) return true;
@@ -118,19 +119,14 @@ abstract final class AppAccess {
       return false;
     }
 
-    if (location == AppRoutes.dashboard) return true;
-    if (location == AppRoutes.myDetails) return true;
-    if (location == AppRoutes.hrms) return true;
-
-    final id = user.employeeId?.trim();
-    if (id != null && id.isNotEmpty) {
-      if (location == AppRoutes.employeeCompensation(id)) return true;
-      if (location == AppRoutes.expenses ||
-          location.startsWith('${AppRoutes.expenses}/')) {
-        return true;
-      }
+    final path = Uri.tryParse(location)?.path ?? location;
+    if (path == AppRoutes.dashboard || path == AppRoutes.employeeIdCard) {
+      return true;
     }
-
+    if (path == AppRoutes.myDetails) return true;
+    // Employee self-service is intentionally limited to profile, ID card and
+    // salary slips. Finance, purchase orders, payroll and compensation are
+    // staff-only, including when a user enters a URL directly.
     return false;
   }
 }
