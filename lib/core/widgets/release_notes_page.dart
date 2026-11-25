@@ -16,6 +16,7 @@ class ReleaseNotesPage extends StatefulWidget {
 
 class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
   String? _runningVersion;
+  String? _selectedVersion;
 
   @override
   void initState() {
@@ -30,6 +31,10 @@ class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
   Widget build(BuildContext context) {
     final running = _runningVersion?.trim() ?? '';
     final notes = AppReleaseNotes.all;
+    final selected = notes.firstWhere(
+      (note) => note.version == (_selectedVersion ?? running),
+      orElse: () => notes.first,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -119,20 +124,55 @@ class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
                                 ?.copyWith(color: AppColors.textLight),
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                          itemCount: notes.length,
-                          itemBuilder: (context, index) {
-                            final note = notes[index];
-                            final isCurrent =
-                                running.isNotEmpty && note.version == running;
-                            return _ReleaseCard(
-                              note: note,
-                              isCurrent: isCurrent,
-                              isFirst: index == 0,
-                              isLast: index == notes.length - 1,
-                            );
-                          },
+                      : Row(
+                          children: [
+                            SizedBox(
+                              width: 220,
+                              child: ListView(
+                                padding: const EdgeInsets.all(12),
+                                children: [
+                                  for (final note in notes)
+                                    ListTile(
+                                      selected:
+                                          note.version == selected.version,
+                                      selectedTileColor: AppColors.highlight
+                                          .withValues(alpha: 0.12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      title: Text(
+                                        note.label,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        note.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onTap: () => setState(
+                                        () => _selectedVersion = note.version,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const VerticalDivider(width: 1),
+                            Expanded(
+                              child: ListView(
+                                padding: const EdgeInsets.all(28),
+                                children: [
+                                  _ReleaseCard(
+                                    note: selected,
+                                    isCurrent: selected.version == running,
+                                    isFirst: true,
+                                    isLast: true,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                 ),
               ],
