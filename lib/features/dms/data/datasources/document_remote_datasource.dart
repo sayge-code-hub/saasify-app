@@ -215,6 +215,7 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
     if (trimmedFile.isEmpty || fileBytes.isEmpty) {
       throw const ServerException('Choose at least one file to attach.');
     }
+    await _consumeUploadQuota('document_upload');
 
     final safeFile = trimmedFile.replaceAll(RegExp(r'[^\w.\-]+'), '_');
     final id =
@@ -259,12 +260,32 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
       try {
         await _client.storage.from(_bucket).remove([path]);
       } catch (error, stackTrace) {
-        reportRecoverableFailure('Clean up failed document upload', error, stackTrace);
+        reportRecoverableFailure(
+          'Clean up failed document upload',
+          error,
+          stackTrace,
+        );
       }
       throw ServerException(e.message);
     } catch (e) {
       if (e is ServerException) rethrow;
       throw const NetworkException('Failed to add document.');
+    }
+  }
+
+  Future<void> _consumeUploadQuota(String action) async {
+    try {
+      final allowed = await _client.rpc(
+        'consume_sensitive_rate_limit',
+        params: {'p_action': action},
+      );
+      if (allowed != true) {
+        throw const ServerException(
+          'Too many uploads. Please try again shortly.',
+        );
+      }
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
     }
   }
 
@@ -312,7 +333,11 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
         try {
           await _client.storage.from(_bucket).remove([path]);
         } catch (error, stackTrace) {
-          reportRecoverableFailure('Remove deleted document file', error, stackTrace);
+          reportRecoverableFailure(
+            'Remove deleted document file',
+            error,
+            stackTrace,
+          );
         }
       }
     } on PostgrestException catch (e) {

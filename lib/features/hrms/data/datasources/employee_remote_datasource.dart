@@ -5,6 +5,7 @@ import '../../../../core/auth/app_access.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/observability/operational_log.dart';
+import '../../../../core/security/sensitive_data.dart';
 import '../../../../core/storage/app_storage_urls.dart';
 import '../models/employee_model.dart';
 
@@ -43,10 +44,8 @@ abstract class EmployeeRemoteDataSource {
 }
 
 class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
-  EmployeeRemoteDataSourceImpl({
-    SupabaseClient? client,
-    this._authSession,
-  }) : _client = client ?? Supabase.instance.client;
+  EmployeeRemoteDataSourceImpl({SupabaseClient? client, this._authSession})
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
   final AuthSession? _authSession;
@@ -64,11 +63,7 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
       trimmed,
       publicDefault: _avatarsBucket,
     );
-    return AppStorageUrls.publicUrl(
-      _client,
-      bucket: bucket,
-      path: trimmed,
-    );
+    return AppStorageUrls.publicUrl(_client, bucket: bucket, path: trimmed);
   }
 
   EmployeeModel _fromRow(Map<String, dynamic> row) {
@@ -105,7 +100,14 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
       if (AppAccess.isEmployeeOnly(user)) {
         return [
           for (final model in models)
-            EmployeeModel.fromEntity(model.copyWith(monthlyRate: 0)),
+            EmployeeModel.fromEntity(
+              model.copyWith(
+                monthlyRate: 0,
+                bankAccount: SensitiveData.mask(model.bankAccount),
+                pan: SensitiveData.mask(model.pan),
+                uan: SensitiveData.mask(model.uan),
+              ),
+            ),
         ];
       }
       return models;
@@ -193,18 +195,13 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     required DateTime dateOfExit,
   }) async {
     if (!AppAccess.isStaff(_authSession?.user)) {
-      throw const ServerException(
-        'Only owners and admins can exit employees.',
-      );
+      throw const ServerException('Only owners and admins can exit employees.');
     }
     try {
       final exitDay = dateOfExit.toIso8601String().split('T').first;
       final row = await _client
           .from(_table)
-          .update({
-            'is_active': false,
-            'date_of_exit': exitDay,
-          })
+          .update({'is_active': false, 'date_of_exit': exitDay})
           .eq('employee_id', employeeId)
           .select(_selectWithClient)
           .single();
@@ -234,13 +231,12 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
       );
     }
     try {
-      final patch = <String, dynamic>{
-        'is_active': true,
-        'date_of_exit': null,
-      };
+      final patch = <String, dynamic>{'is_active': true, 'date_of_exit': null};
       if (dateOfJoining != null) {
-        patch['date_of_joining'] =
-            dateOfJoining.toIso8601String().split('T').first;
+        patch['date_of_joining'] = dateOfJoining
+            .toIso8601String()
+            .split('T')
+            .first;
       }
 
       final row = await _client
@@ -287,8 +283,9 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         : 'jpg';
     final path =
         '$employeeId/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
-    final contentType =
-        mimeType.trim().isEmpty ? 'image/jpeg' : mimeType.trim();
+    final contentType = mimeType.trim().isEmpty
+        ? 'image/jpeg'
+        : mimeType.trim();
 
     try {
       final existing = await _client
@@ -298,13 +295,12 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
           .maybeSingle();
       final previous = (existing?['photo_path'] ?? '').toString().trim();
 
-      await _client.storage.from(_avatarsBucket).uploadBinary(
+      await _client.storage
+          .from(_avatarsBucket)
+          .uploadBinary(
             path,
             bytes,
-            fileOptions: FileOptions(
-              contentType: contentType,
-              upsert: true,
-            ),
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
           );
 
       final row = await _client
@@ -320,7 +316,11 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         try {
           await _client.storage.from(_avatarsBucket).remove([previous]);
         } catch (error, stackTrace) {
-          reportRecoverableFailure('Remove replaced employee avatar', error, stackTrace);
+          reportRecoverableFailure(
+            'Remove replaced employee avatar',
+            error,
+            stackTrace,
+          );
         }
       }
 
@@ -346,10 +346,21 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
       );
     }
     final path = storagePath.trim();
-    if (path.isEmpty) {
-      throw const ServerException('Document path is missing.');
+    if (!SensitiveData.isEmployeeDocumentPath(path, employeeId)) {
+      throw const ServerException(
+        'Choose an image document belonging to this employee.',
+      );
     }
     try {
+      final allowed = await _client.rpc(
+        'consume_sensitive_rate_limit',
+        params: {'p_action': 'employee_photo_copy'},
+      );
+      if (allowed != true) {
+        throw const ServerException(
+          'Too many requests. Please try again shortly.',
+        );
+      }
       // Copy into the public avatars bucket — never point photo_path at private
       // `documents/` objects (getPublicUrl would fail / leak if misconfigured).
       final sourceBucket = AppStorageUrls.bucketForPath(
@@ -358,6 +369,11 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
       );
       final bytes = await _client.storage.from(sourceBucket).download(path);
       final fileName = path.split('/').last;
+      if (!SensitiveData.isImageFileName(fileName)) {
+        throw const ServerException(
+          'Only JPG, PNG, and WebP images can be used.',
+        );
+      }
       final ext = fileName.contains('.')
           ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase()
           : 'jpg';

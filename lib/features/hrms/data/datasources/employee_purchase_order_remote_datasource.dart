@@ -39,7 +39,7 @@ abstract class EmployeePurchaseOrderRemoteDataSource {
 class EmployeePurchaseOrderRemoteDataSourceImpl
     implements EmployeePurchaseOrderRemoteDataSource {
   EmployeePurchaseOrderRemoteDataSourceImpl({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
 
@@ -112,19 +112,27 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
     if (endDate.isBefore(startDate)) {
       throw const ServerException('End date must be on or after start date.');
     }
+    final allowed = await _client.rpc(
+      'consume_sensitive_rate_limit',
+      params: {'p_action': 'purchase_order_upload'},
+    );
+    if (allowed != true) {
+      throw const ServerException(
+        'Too many uploads. Please try again shortly.',
+      );
+    }
 
     final safeFile = trimmedFile.replaceAll(RegExp(r'[^\w.\-]+'), '_');
     final id = 'po_${employeeId}_${DateTime.now().microsecondsSinceEpoch}';
     final path = '$employeeId/$id/$safeFile';
 
     try {
-      await _client.storage.from(_bucket).uploadBinary(
+      await _client.storage
+          .from(_bucket)
+          .uploadBinary(
             path,
             fileBytes,
-            fileOptions: FileOptions(
-              contentType: mimeType,
-              upsert: false,
-            ),
+            fileOptions: FileOptions(contentType: mimeType, upsert: false),
           );
 
       final model = EmployeePurchaseOrderModel(
@@ -151,7 +159,11 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
       try {
         await _client.storage.from(_bucket).remove([path]);
       } catch (error, stackTrace) {
-        reportRecoverableFailure('Clean up failed purchase-order upload', error, stackTrace);
+        reportRecoverableFailure(
+          'Clean up failed purchase-order upload',
+          error,
+          stackTrace,
+        );
       }
       throw ServerException(e.message);
     } catch (e) {
@@ -180,7 +192,8 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
 
     final replacementName = fileName?.trim() ?? '';
     final replacementBytes = fileBytes;
-    final replaceFile = replacementName.isNotEmpty &&
+    final replaceFile =
+        replacementName.isNotEmpty &&
         replacementBytes != null &&
         replacementBytes.isNotEmpty;
 
@@ -209,18 +222,16 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
       String? newPath;
       String? previousPath;
       if (replaceFile) {
-        final safeFile =
-            replacementName.replaceAll(RegExp(r'[^\w.\-]+'), '_');
+        final safeFile = replacementName.replaceAll(RegExp(r'[^\w.\-]+'), '_');
         newPath = '${current.employeeId}/$id/$safeFile';
         previousPath = current.storagePath.trim();
 
-        await _client.storage.from(_bucket).uploadBinary(
+        await _client.storage
+            .from(_bucket)
+            .uploadBinary(
               newPath,
               replacementBytes,
-              fileOptions: FileOptions(
-                contentType: mimeType,
-                upsert: true,
-              ),
+              fileOptions: FileOptions(contentType: mimeType, upsert: true),
             );
 
         patch['file_name'] = safeFile;
@@ -242,7 +253,11 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
         try {
           await _client.storage.from(_bucket).remove([previousPath]);
         } catch (error, stackTrace) {
-          reportRecoverableFailure('Remove replaced purchase-order file', error, stackTrace);
+          reportRecoverableFailure(
+            'Remove replaced purchase-order file',
+            error,
+            stackTrace,
+          );
         }
       }
 
@@ -269,8 +284,7 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
           .select('storage_path')
           .eq('id', trimmed)
           .maybeSingle();
-      final storagePath =
-          (existing?['storage_path'] ?? '').toString().trim();
+      final storagePath = (existing?['storage_path'] ?? '').toString().trim();
 
       await _client.from(_table).delete().eq('id', trimmed);
 
@@ -278,7 +292,11 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
         try {
           await _client.storage.from(_bucket).remove([storagePath]);
         } catch (error, stackTrace) {
-          reportRecoverableFailure('Remove deleted purchase-order file', error, stackTrace);
+          reportRecoverableFailure(
+            'Remove deleted purchase-order file',
+            error,
+            stackTrace,
+          );
         }
       }
     } on PostgrestException catch (e) {
