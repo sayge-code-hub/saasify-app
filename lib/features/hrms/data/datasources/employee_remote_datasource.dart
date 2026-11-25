@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/auth/app_access.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/observability/operational_log.dart';
 import '../../../../core/storage/app_storage_urls.dart';
 import '../models/employee_model.dart';
 
@@ -318,7 +319,9 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
           !previous.startsWith('documents/')) {
         try {
           await _client.storage.from(_avatarsBucket).remove([previous]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Remove replaced employee avatar', error, stackTrace);
+        }
       }
 
       return _fromRow(row);

@@ -1,12 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import '../observability/operational_log.dart';
+
 /// Reads public client config from the bundled `assets/config/app.env` asset.
 abstract final class AppConfig {
   static String get supabaseUrl {
     try {
       return dotenv.env['SUPABASE_URL']?.trim() ?? '';
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportRecoverableFailure('Read Supabase URL configuration', error, stackTrace);
       return '';
     }
   }
@@ -14,7 +17,8 @@ abstract final class AppConfig {
   static String get supabaseAnonKey {
     try {
       return dotenv.env['SUPABASE_ANON_KEY']?.trim() ?? '';
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportRecoverableFailure('Read Supabase anonymous key configuration', error, stackTrace);
       return '';
     }
   }
@@ -27,7 +31,9 @@ abstract final class AppConfig {
       if (fromEnv.isNotEmpty) {
         return fromEnv.replaceAll(RegExp(r'/+$'), '');
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      reportRecoverableFailure('Read public URL configuration', error, stackTrace);
+    }
     if (kIsWeb) {
       return Uri.base.origin;
     }

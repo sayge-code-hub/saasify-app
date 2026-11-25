@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/auth/app_access.dart';
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/auth/google_auth_intent.dart';
 import '../../../../core/billing/billing_access.dart';
 import '../../../../core/layout/breakpoints.dart';
 import '../../../../core/router/app_routes.dart';
@@ -16,7 +18,7 @@ import '../../../../core/widgets/auth_page_scaffold.dart';
 import '../../../../injection_container.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 
-/// Public Saasify self-serve signup (Free plan). Payment gateway not connected.
+/// Public Saasify self-serve signup (Free plan).
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
 
@@ -53,6 +55,10 @@ class _SignupPageState extends State<SignupPage> {
       setState(() => _error = 'Enter your company name.');
       return;
     }
+    if (name.isEmpty) {
+      setState(() => _error = 'Enter your name.');
+      return;
+    }
     if (emailErr != null) {
       setState(() => _error = emailErr);
       return;
@@ -75,8 +81,8 @@ class _SignupPageState extends State<SignupPage> {
         data: {
           'saasify_signup': 'true',
           'company_name': company,
-          'full_name': name.isEmpty ? email.split('@').first : name,
-          'name': name.isEmpty ? email.split('@').first : name,
+          'full_name': name,
+          'name': name,
           'role_code': 'owner',
           'member_role': 'owner',
         },
@@ -88,10 +94,7 @@ class _SignupPageState extends State<SignupPage> {
       // Provision company + Free subscription (idempotent).
       await client.rpc(
         'saasify_complete_signup',
-        params: {
-          'p_company_name': company,
-          'p_display_name': company,
-        },
+        params: {'p_company_name': company, 'p_display_name': company},
       );
 
       final profile = await sl<AuthRemoteDataSource>().restoreSession();
@@ -120,6 +123,24 @@ class _SignupPageState extends State<SignupPage> {
     }
   }
 
+  Future<void> _signUpWithGoogle() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await GoogleAuthFlow.start(GoogleAuthIntent.signup);
+      await sl<AuthRemoteDataSource>().signInWithGoogle();
+    } catch (e) {
+      await GoogleAuthFlow.clear();
+      if (!mounted) return;
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final compact = Breakpoints.isCompact(context);
@@ -128,21 +149,19 @@ class _SignupPageState extends State<SignupPage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Saasify',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.6,
-                ),
+          Image.asset(
+            'assets/images/saasify_logo.png',
+            height: compact ? 40 : 48,
+            fit: BoxFit.contain,
+            semanticLabel: 'Saasify',
           ),
           SizedBox(height: compact ? 8 : 10),
           Text(
             'Create your company workspace on the Free plan.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textLight,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textLight),
           ),
           SizedBox(height: compact ? 24 : 28),
           AppTextField(
@@ -156,7 +175,7 @@ class _SignupPageState extends State<SignupPage> {
           AppTextField(
             controller: _nameController,
             label: 'Your name',
-            hintText: 'Optional',
+            hintText: 'Aditi Rana',
             textInputAction: TextInputAction.next,
             enabled: !_busy,
           ),
@@ -181,9 +200,9 @@ class _SignupPageState extends State<SignupPage> {
             Text(
               _error!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.error,
-                    fontWeight: FontWeight.w500,
-                  ),
+                color: AppColors.error,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
           const SizedBox(height: 20),
@@ -192,15 +211,28 @@ class _SignupPageState extends State<SignupPage> {
             onPressed: _busy ? null : _submit,
           ),
           const SizedBox(height: 16),
-          Text(
-            'Payments are not connected yet — Free plan only. '
-            'Upgrade via platform ops / billing later.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textLight,
+          SizedBox(
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : _signUpWithGoogle,
+              icon: SvgPicture.asset(
+                'assets/images/google_g_logo.svg',
+                width: 18,
+                height: 18,
+                semanticsLabel: 'Google',
+              ),
+              label: const Text('Continue with Google'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.text,
+                side: const BorderSide(color: AppColors.border),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           TextButton(
             onPressed: _busy ? null : () => context.go(AppRoutes.login),
             child: const Text('Already have an account? Sign in'),

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/auth/app_access.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/observability/operational_log.dart';
 import '../../../../core/storage/app_storage_urls.dart';
 import '../../domain/entities/settings_entities.dart';
 
@@ -192,7 +193,9 @@ class SettingsRemoteDataSourceImpl implements SettingsRemoteDataSource {
           !previous.startsWith('documents/')) {
         try {
           await _client.storage.from(_brandLogosBucket).remove([previous]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Remove replaced company logo', error, stackTrace);
+        }
       }
 
       return _withLogoUrl(_companyFromJson(row));

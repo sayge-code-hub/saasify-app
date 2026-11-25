@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/observability/operational_log.dart';
 import '../models/employee_purchase_order_model.dart';
 
 abstract class EmployeePurchaseOrderRemoteDataSource {
@@ -149,7 +150,9 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
     } on PostgrestException catch (e) {
       try {
         await _client.storage.from(_bucket).remove([path]);
-      } catch (_) {}
+      } catch (error, stackTrace) {
+        reportRecoverableFailure('Clean up failed purchase-order upload', error, stackTrace);
+      }
       throw ServerException(e.message);
     } catch (e) {
       if (e is ServerException) rethrow;
@@ -238,7 +241,9 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
           previousPath != newPath) {
         try {
           await _client.storage.from(_bucket).remove([previousPath]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Remove replaced purchase-order file', error, stackTrace);
+        }
       }
 
       return EmployeePurchaseOrderModel.fromJson(row);
@@ -272,7 +277,9 @@ class EmployeePurchaseOrderRemoteDataSourceImpl
       if (storagePath.isNotEmpty) {
         try {
           await _client.storage.from(_bucket).remove([storagePath]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Remove deleted purchase-order file', error, stackTrace);
+        }
       }
     } on PostgrestException catch (e) {
       throw ServerException(e.message);

@@ -7,9 +7,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/auth/app_access.dart';
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/auth/google_auth_intent.dart';
 import '../../../../core/auth/password_setup.dart';
 import '../../../../core/billing/billing_access.dart';
 import '../../../../core/layout/breakpoints.dart';
+import '../../../../core/modules/module_access.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/widgets/app_version_label.dart';
 import '../../../../core/widgets/auth_page_scaffold.dart';
@@ -75,12 +77,17 @@ class _LoginViewState extends State<LoginView> {
     try {
       final profile = await sl<AuthRemoteDataSource>().restoreSession();
       if (profile == null) {
+        if (await GoogleAuthFlow.read() == GoogleAuthIntent.signup) {
+          if (mounted) context.go(AppRoutes.googleOnboarding);
+          return;
+        }
+        await GoogleAuthFlow.clear();
         await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'This Google account is not authorized for Saasify. Ask your administrator for an invite.',
+                'This Google account is not authorized for Saasify. Create a workspace to get started.',
               ),
               behavior: SnackBarBehavior.floating,
             ),
@@ -88,8 +95,10 @@ class _LoginViewState extends State<LoginView> {
         }
         return;
       }
+      await GoogleAuthFlow.clear();
       await sl<AuthSession>().setUser(profile, needsPasswordSetup: false);
       await sl<BillingAccess>().refresh();
+      await sl<ModuleAccess>().refresh();
       if (mounted) context.go(AppAccess.homeRoute(profile));
     } finally {
       _handlingGoogleSignIn = false;
@@ -108,6 +117,7 @@ class _LoginViewState extends State<LoginView> {
             needsPasswordSetup: needsSetup,
           );
           await sl<BillingAccess>().refresh();
+          await sl<ModuleAccess>().refresh();
           if (!context.mounted) return;
           context.go(
             needsSetup

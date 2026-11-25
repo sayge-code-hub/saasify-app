@@ -35,12 +35,9 @@ lib/
 
    | Order | File | Purpose |
    | --- | --- | --- |
-   | 1 | `supabase/schema.sql` | Tables, triggers, storage buckets. Enables RLS but defines **no** policies, so a half-finished setup is deny-all rather than open. |
-   | 2 | `supabase/security_hardening.sql` | Authoritative grants + RLS policies. Revokes every `anon` privilege, drops all existing policies, and recreates them for `authenticated` only. Requires `users.is_active` for role helpers. |
-   | 3 | Feature packs (as needed) | `ops_completeness_pack.sql` (invoice payment + payroll + expense receipts), `expense_categories.sql`, `pos.sql` + `pos_product_commerce.sql`, then **re-run** `security_hardening.sql`. |
-   | 4 | `supabase/billing_closed_beta.sql`, then `supabase/multi_tenant.sql` | Per-company billing and tenant isolation. |
-   | 5 | `supabase/production_security_hardening.sql` | Retires legacy browser-accessible privileged RPCs without touching data. |
-   | 6 | `supabase/security_verification.sql` | Asserts anon is still locked down. |
+   | 1 | `supabase/migrations/` | The sole source of executable, versioned schema changes. Apply with `supabase db push --remote`. |
+   | 2 | `supabase/MIGRATIONS.md` | Release procedure and migration policy. |
+   | 3 | `supabase/legacy/manual/` | Historical audit material only; never execute it in production. |
 
    Without `SUPABASE_DB_URL`/`psql`, paste the files into Supabase → SQL Editor
    in the same order. The script then verifies the result.
@@ -48,9 +45,9 @@ lib/
    - Creates `roles` + `users` (profiles linked to Auth), HRMS/DMS tables
    - Employees link to clients via `client_id` (delete client sets `client_id` null)
    - `activity_log` records every insert/update/delete on app tables
-   - **Do not** re-run `ops_completeness_pack.sql` or `fix_rbac_policies.sql` after
-     hardening without applying `security_hardening.sql` again last — those packs
-     can loosen payroll field guards.
+   - **Do not** run scripts under `supabase/archive/`. They are historical,
+     demo-only, destructive, or superseded and intentionally excluded from the
+     production migration path.
 3. **Existing project upgrade (gaps pack):** run `supabase/production_gaps_pack.sql`
    (adds `date_of_birth`, DMS `subtitle`, active-user guards, employee-readable
    expense categories). Then run any still-pending feature scripts
@@ -145,7 +142,7 @@ and `service_role`. Extension-owned functions are left untouched.
 ./scripts/setup_supabase.sh   # exits non-zero if any table answers 200 to anon
 ```
 
-Then run `supabase/security_verification.sql` in the SQL Editor. Checks 1, 2,
+Then run `supabase/legacy/manual/security_verification.sql` in the SQL Editor. Checks 1, 2,
 3, 7, 8, 9 and 14 must return zero rows; checks 4, 5, 6, 10–13 are inventories
 with the expected result noted above each query. Check 11 reports each expected
 table as `ok`, `missing (optional feature not installed)`, or `EXPOSED - …`, so

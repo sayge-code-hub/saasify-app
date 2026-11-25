@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../../features/settings/domain/entities/settings_entities.dart';
 import '../config/app_invoice_config.dart';
 import '../config/app_proposal_config.dart';
+import '../observability/operational_log.dart';
 
 /// Seller block for PDF documents — prefers live [CompanyDetails], else config.
 class PdfCompanyProfile {
@@ -138,7 +139,9 @@ class PdfCompanyProfile {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         return res.bodyBytes;
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      reportRecoverableFailure('Download company logo for PDF', error, stackTrace);
+    }
     return null;
   }
 }

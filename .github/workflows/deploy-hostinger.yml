@@ -115,7 +115,10 @@ jobs:
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           local-dir: ./build/web/
           server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
-          dangerous-clean-slate: true
+          # Never delete the entire remote directory during an application deploy.
+          # Hashed Flutter assets make stale files harmless, while this protects
+          # unrelated hosting content if the FTP path is ever misconfigured.
+          dangerous-clean-slate: false
           exclude: |
             **/.git*
             **/.git*/**

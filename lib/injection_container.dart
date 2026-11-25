@@ -9,6 +9,7 @@ import 'core/auth/password_setup.dart';
 import 'core/billing/billing_access.dart';
 import 'core/billing/billing_remote_datasource.dart';
 import 'core/config/app_config.dart';
+import 'core/modules/module_access.dart';
 import 'core/theme/app_accent.dart';
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
@@ -138,16 +139,19 @@ Future<void> initDependencies() async {
     () => BillingRemoteDataSource(),
   );
   sl.registerLazySingleton<BillingAccess>(() => BillingAccess(sl()));
+  sl.registerLazySingleton<ModuleAccess>(() => ModuleAccess());
   if (restoredUser != null) {
     // Fire-and-forget; UI listens / refreshes on shell open.
     // ignore: unawaited_futures
     sl<BillingAccess>().refresh();
+    // ignore: unawaited_futures
+    sl<ModuleAccess>().refresh();
   }
 
   sl.registerFactory(() => LoginBloc(loginUseCase: sl()));
   sl.registerLazySingleton(() => LoginUseCase(sl()));
   sl.registerLazySingleton(() => ResetPasswordUseCase(sl()));
-  sl.registerLazySingleton(() => SignOutUseCase(sl(), sl(), sl()));
+  sl.registerLazySingleton(() => SignOutUseCase(sl(), sl(), sl(), sl()));
   sl.registerLazySingleton(() => UpdateAvatarUseCase(sl()));
 
   sl.registerFactory(

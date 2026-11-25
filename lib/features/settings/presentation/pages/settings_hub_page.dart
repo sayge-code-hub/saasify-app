@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/layout/breakpoints.dart';
+import '../../../../core/modules/module_access.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/widgets/app_hub_tile.dart';
+import '../../../../injection_container.dart';
 
 class SettingsHubPage extends StatelessWidget {
   const SettingsHubPage({super.key});
@@ -11,7 +13,9 @@ class SettingsHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDesktop = Breakpoints.isDesktop(context);
-    const tiles = [
+    final showModuleControls =
+        sl.isRegistered<ModuleAccess>() && sl<ModuleAccess>().isPlatformAdmin;
+    const standardTiles = [
       _SettingsTileData(
         title: 'Invite employee',
         icon: Icons.person_add_alt_1_outlined,
@@ -72,14 +76,20 @@ class SettingsHubPage extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 1180),
           child: GridView.builder(
             shrinkWrap: true,
-            itemCount: tiles.length,
+            itemCount: standardTiles.length + (showModuleControls ? 1 : 0),
             gridDelegate: AppHubGrid.delegate(
               isDesktop: isDesktop,
               hasSubtitle: false,
               columns: 4,
             ),
             itemBuilder: (context, index) {
-              final tile = tiles[index];
+              final tile = index < standardTiles.length
+                  ? standardTiles[index]
+                  : const _SettingsTileData(
+                      title: 'Product modules',
+                      icon: Icons.tune_outlined,
+                      path: AppRoutes.platformModules,
+                    );
               return AppHubTile(
                 title: tile.title,
                 icon: tile.icon,
