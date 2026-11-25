@@ -132,7 +132,6 @@ class _GoogleOnboardingPageState extends State<GoogleOnboardingPage> {
           AppTextField(
             controller: _company,
             label: 'Company name',
-            hintText: 'Acme Cafe',
             textInputAction: TextInputAction.next,
             enabled: !_saving,
           ),

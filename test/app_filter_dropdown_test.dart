@@ -57,7 +57,7 @@ void main() {
 
     final dropdown = find.byType(AppFilterDropdown<String?>);
 
-    expect(AppFilterDropdown.height, 44);
+    expect(AppFilterDropdown.height, 34);
     expect(tester.getSize(dropdown).height, AppFilterDropdown.height);
     expect(find.text('All clients'), findsOneWidget);
     expect(tester.takeException(), isNull);

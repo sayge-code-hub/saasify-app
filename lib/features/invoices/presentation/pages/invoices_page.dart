@@ -753,10 +753,14 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
     return null;
   }
 
-  String? _poLineMismatch(
+  String? _poLineMismatchForLine(
+    int lineIndex,
     List<EmployeePurchaseOrder> purchaseOrders,
     List<Employee> employees,
   ) {
+    if (lineIndex >= _lines.length) return null;
+    final particulars = _lines[lineIndex].particulars.text.trim();
+    if (particulars.isEmpty) return null;
     final po = _selectedPo(purchaseOrders);
     if (po == null) return null;
     Employee? employee;
@@ -769,10 +773,7 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
     final name = employee?.employeeName.trim() ?? '';
     if (name.isEmpty) return null;
     final expected = name.toLowerCase();
-    final matches = _lines.any(
-      (line) => line.particulars.text.toLowerCase().contains(expected),
-    );
-    if (matches) return null;
+    if (particulars.toLowerCase().contains(expected)) return null;
     return 'PO ${po.poNumber} is assigned to $name (${po.employeeId}). '
         'The selected line item does not match this employee.';
   }
@@ -800,7 +801,6 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
     final pos = widget.state.purchaseOrders;
     final candidates = _candidates(employees);
     final draft = _draftInvoice();
-    final poMismatch = _poLineMismatch(pos, employees);
 
     return PopScope(
       canPop: false,
@@ -974,17 +974,6 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
                                   ],
                                 ),
                         ),
-                        if (poMismatch != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            poMismatch,
-                            style: const TextStyle(
-                              color: AppColors.error,
-                              fontSize: 10,
-                              height: 1.25,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                     AppTextField(
@@ -1188,7 +1177,12 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
                     children: [
                       for (var i = 0; i < _lines.length; i++) ...[
                         if (i > 0) const SizedBox(height: 12),
-                        _buildLine(i, saving, candidates),
+                        _buildLine(
+                          i,
+                          saving,
+                          candidates,
+                          poMismatch: _poLineMismatchForLine(i, pos, employees),
+                        ),
                       ],
                       const SizedBox(height: 16),
                       Align(
@@ -1266,7 +1260,12 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
     );
   }
 
-  Widget _buildLine(int index, bool saving, List<Employee> candidates) {
+  Widget _buildLine(
+    int index,
+    bool saving,
+    List<Employee> candidates, {
+    String? poMismatch,
+  }) {
     final line = _lines[index];
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1338,6 +1337,20 @@ class _InvoiceFormViewState extends State<_InvoiceFormView> {
                     ],
                   ),
           ),
+          if (poMismatch != null) ...[
+            const SizedBox(height: 5),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                poMismatch,
+                style: const TextStyle(
+                  color: AppColors.error,
+                  fontSize: 10,
+                  height: 1.25,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           AppTextField(
             label: 'Amount',

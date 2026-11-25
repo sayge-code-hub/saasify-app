@@ -2,8 +2,7 @@
 enum DmsEntityType {
   employee,
   client,
-  vendor,
-  candidate;
+  vendor;
 
   String get label {
     switch (this) {
@@ -13,8 +12,6 @@ enum DmsEntityType {
         return 'Clients';
       case DmsEntityType.vendor:
         return 'Vendors';
-      case DmsEntityType.candidate:
-        return 'Candidates';
     }
   }
 
@@ -26,8 +23,6 @@ enum DmsEntityType {
         return 'Client';
       case DmsEntityType.vendor:
         return 'Vendor';
-      case DmsEntityType.candidate:
-        return 'Candidate';
     }
   }
 
@@ -41,8 +36,6 @@ enum DmsEntityType {
         return 'company';
       case DmsEntityType.vendor:
         return 'vendor';
-      case DmsEntityType.candidate:
-        return 'candidate';
     }
   }
 
@@ -55,15 +48,13 @@ enum DmsEntityType {
         return DmsEntityType.client;
       case 'vendor':
         return DmsEntityType.vendor;
-      case 'candidate':
-        return DmsEntityType.candidate;
       default:
         return DmsEntityType.employee;
     }
   }
 }
 
-/// A browsable DMS owner (employee, client, vendor, or candidate).
+/// A browsable DMS owner (employee, client, or vendor).
 class DmsEntity {
   const DmsEntity({
     required this.id,

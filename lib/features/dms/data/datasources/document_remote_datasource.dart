@@ -69,7 +69,6 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
         case DmsEntityType.client:
           return await _clients();
         case DmsEntityType.vendor:
-        case DmsEntityType.candidate:
           return await _catalogEntities(type);
       }
     } on PostgrestException catch (e) {
@@ -379,10 +378,8 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
     required String name,
     String subtitle = '',
   }) async {
-    if (type != DmsEntityType.vendor && type != DmsEntityType.candidate) {
-      throw const ServerException(
-        'Only vendors and candidates can be added from DMS.',
-      );
+    if (type != DmsEntityType.vendor) {
+      throw const ServerException('Only vendors can be added from DMS.');
     }
     final trimmed = name.trim();
     if (trimmed.isEmpty) {

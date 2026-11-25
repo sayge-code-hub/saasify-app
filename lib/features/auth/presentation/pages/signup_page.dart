@@ -167,7 +167,6 @@ class _SignupPageState extends State<SignupPage> {
           AppTextField(
             controller: _companyController,
             label: 'Company name',
-            hintText: 'Acme Cafe',
             textInputAction: TextInputAction.next,
             enabled: !_busy,
           ),
@@ -175,7 +174,6 @@ class _SignupPageState extends State<SignupPage> {
           AppTextField(
             controller: _nameController,
             label: 'Your name',
-            hintText: 'Aditi Rana',
             textInputAction: TextInputAction.next,
             enabled: !_busy,
           ),

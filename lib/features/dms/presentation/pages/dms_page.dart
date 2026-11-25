@@ -42,10 +42,7 @@ class _DmsBody extends StatelessWidget {
           prev.status != next.status && next.status == DmsStatus.success,
       listener: (context, state) async {
         if (state.status == DmsStatus.success) {
-          await showAppMessageDialog(
-            context,
-            message: 'Documents attached',
-          );
+          await showAppMessageDialog(context, message: 'Documents attached');
         }
       },
       builder: (context, state) {
@@ -103,8 +100,6 @@ IconData _iconFor(DmsEntityType type) {
       return Icons.apartment_outlined;
     case DmsEntityType.vendor:
       return Icons.storefront_outlined;
-    case DmsEntityType.candidate:
-      return Icons.badge_outlined;
   }
 }
 
@@ -170,8 +165,7 @@ class _EntityListViewState extends State<_EntityListView> {
                 e.subtitle.toLowerCase().contains(q);
           }).toList();
 
-    final canAddCatalog = state.entityType == DmsEntityType.vendor ||
-        state.entityType == DmsEntityType.candidate;
+    final canAddCatalog = state.entityType == DmsEntityType.vendor;
 
     Future<void> addCatalogEntity() async {
       final nameCtrl = TextEditingController();
@@ -186,7 +180,11 @@ class _EntityListViewState extends State<_EntityListView> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AppTextField(label: 'Name', controller: nameCtrl, autofocus: true),
+                AppTextField(
+                  label: 'Name',
+                  controller: nameCtrl,
+                  autofocus: true,
+                ),
                 const SizedBox(height: 12),
                 AppTextField(label: 'Subtitle', controller: subtitleCtrl),
               ],
@@ -213,12 +211,12 @@ class _EntityListViewState extends State<_EntityListView> {
       subtitleCtrl.dispose();
       if (created != true || name.isEmpty || !context.mounted) return;
       context.read<DmsBloc>().add(
-            DmsCatalogEntityCreateRequested(
-              type: state.entityType,
-              name: name,
-              subtitle: subtitle,
-            ),
-          );
+        DmsCatalogEntityCreateRequested(
+          type: state.entityType,
+          name: name,
+          subtitle: subtitle,
+        ),
+      );
     }
 
     return Column(
@@ -264,74 +262,71 @@ class _EntityListViewState extends State<_EntityListView> {
                     child: CircularProgressIndicator(color: AppColors.text),
                   )
                 : state.entities.isEmpty
-                    ? Center(
-                        child: Text(
-                          canAddCatalog
-                              ? 'No ${state.entityType.label.toLowerCase()} yet. Tap Add to create one.'
-                              : 'No ${state.entityType.label.toLowerCase()} found.',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textLight,
-                          ),
-                          textAlign: TextAlign.center,
+                ? Center(
+                    child: Text(
+                      canAddCatalog
+                          ? 'No ${state.entityType.label.toLowerCase()} yet. Tap Add to create one.'
+                          : 'No ${state.entityType.label.toLowerCase()} found.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textLight,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : entities.isEmpty
+                ? Center(
+                    child: Text(
+                      'No matches.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textLight,
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: entities.length,
+                    separatorBuilder: (_, _) =>
+                        const Divider(height: 1, color: AppColors.border),
+                    itemBuilder: (context, index) {
+                      final entity = entities[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? 20 : 16,
+                          vertical: 8,
                         ),
-                      )
-                    : entities.isEmpty
-                        ? Center(
-                            child: Text(
-                              'No matches.',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: AppColors.textLight,
-                              ),
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: entities.length,
-                            separatorBuilder: (_, _) => const Divider(
-                              height: 1,
-                              color: AppColors.border,
-                            ),
-                            itemBuilder: (context, index) {
-                              final entity = entities[index];
-                              return ListTile(
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: isDesktop ? 20 : 16,
-                                  vertical: 8,
-                                ),
-                                leading: entity.imageUrl != null ||
-                                        entity.type ==
-                                            DmsEntityType.employee ||
-                                        entity.type == DmsEntityType.client
-                                    ? EmployeeAvatar(
-                                        name: entity.name,
-                                        photoUrl: entity.imageUrl,
-                                        radius: 18,
-                                      )
-                                    : null,
-                                title: Text(
-                                  entity.name,
-                                  style: textTheme.bodyLarge
-                                      ?.copyWith(fontSize: 14),
-                                ),
-                                subtitle: entity.subtitle.isEmpty
-                                    ? null
-                                    : Text(
-                                        entity.subtitle,
-                                        style: textTheme.bodyMedium?.copyWith(
-                                          fontSize: 12,
-                                          color: AppColors.textLight,
-                                        ),
-                                      ),
-                                trailing: const Icon(
-                                  Icons.chevron_right,
+                        leading:
+                            entity.imageUrl != null ||
+                                entity.type == DmsEntityType.employee ||
+                                entity.type == DmsEntityType.client
+                            ? EmployeeAvatar(
+                                name: entity.name,
+                                photoUrl: entity.imageUrl,
+                                radius: 18,
+                              )
+                            : null,
+                        title: Text(
+                          entity.name,
+                          style: textTheme.bodyLarge?.copyWith(fontSize: 14),
+                        ),
+                        subtitle: entity.subtitle.isEmpty
+                            ? null
+                            : Text(
+                                entity.subtitle,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  fontSize: 12,
                                   color: AppColors.textLight,
-                                  size: 18,
                                 ),
-                                onTap: () => context
-                                    .read<DmsBloc>()
-                                    .add(DmsEntitySelected(entity)),
-                              );
-                            },
-                          ),
+                              ),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textLight,
+                          size: 18,
+                        ),
+                        onTap: () => context.read<DmsBloc>().add(
+                          DmsEntitySelected(entity),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ),
       ],
@@ -434,15 +429,15 @@ class _DocumentsView extends StatelessWidget {
                         uploading: state.status == DmsStatus.saving,
                         onFilesPicked: (files) {
                           context.read<DmsBloc>().add(
-                                DmsFilesSelected([
-                                  for (final file in files)
-                                    DmsPickedFile(
-                                      fileName: file.fileName,
-                                      bytes: file.bytes,
-                                      mimeType: file.mimeType,
-                                    ),
-                                ]),
-                              );
+                            DmsFilesSelected([
+                              for (final file in files)
+                                DmsPickedFile(
+                                  fileName: file.fileName,
+                                  bytes: file.bytes,
+                                  mimeType: file.mimeType,
+                                ),
+                            ]),
+                          );
                         },
                       ),
                       if (state.errorMessage != null) ...[
@@ -477,12 +472,12 @@ class _DocumentRow extends StatelessWidget {
     if (bytes.isEmpty) return;
     if (!context.mounted) return;
     context.read<DmsBloc>().add(
-          DmsDocumentReplaceRequested(
-            existing: document,
-            fileName: file.name,
-            fileBytes: bytes,
-          ),
-        );
+      DmsDocumentReplaceRequested(
+        existing: document,
+        fileName: file.name,
+        fileBytes: bytes,
+      ),
+    );
   }
 
   @override
@@ -503,16 +498,16 @@ class _DocumentRow extends StatelessWidget {
                 document.title.trim().isEmpty
                     ? document.fileName
                     : document.title,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Text(
                 document.fileName,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textLight,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textLight),
               ),
               const SizedBox(height: 8),
               Row(
@@ -546,9 +541,9 @@ class _DocumentRow extends StatelessWidget {
                         ),
                       );
                       if (ok != true || !context.mounted) return;
-                      context
-                          .read<DmsBloc>()
-                          .add(DmsDocumentDeleteRequested(document.id));
+                      context.read<DmsBloc>().add(
+                        DmsDocumentDeleteRequested(document.id),
+                      );
                     },
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.error,
