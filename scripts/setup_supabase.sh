@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Applies the Sayge database setup in order, then verifies that anonymous
-# requests are denied. No seed/demo data.
+# Verifies the Sayge database after versioned migrations are applied. No
+# seed/demo data. Apply schema changes with `supabase db push --remote`.
 #
-# Order matters:
-#   1. supabase/schema.sql             tables, triggers, storage buckets
-#   2. supabase/security_hardening.sql grants + RLS policies (authoritative)
+# Apply changes with `supabase db push --remote`, then use this script to
+# verify anonymous API access is denied.
 #
 # Required in .env or .env.example:
 #   SUPABASE_URL=https://xxxx.supabase.co
@@ -34,9 +33,6 @@ elif [[ -f .env.example ]]; then
   set +a
 fi
 
-SCHEMA_FILE="$ROOT_DIR/supabase/schema.sql"
-SECURITY_FILE="$ROOT_DIR/supabase/security_hardening.sql"
-
 need() {
   local name="$1"
   if [[ -z "${!name:-}" ]]; then
@@ -48,27 +44,8 @@ need() {
 need SUPABASE_URL
 need SUPABASE_ANON_KEY
 
-echo "==> Sayge Supabase setup (schema + security, no seed data)"
+echo "==> Sayge Supabase verification (versioned migrations only)"
 echo "    URL: $SUPABASE_URL"
-
-apply_sql() {
-  if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
-    return 1
-  fi
-  if ! command -v psql >/dev/null 2>&1; then
-    echo "psql not found. Install PostgreSQL client tools, or run the SQL files in the SQL Editor." >&2
-    return 1
-  fi
-
-  echo "==> 1/2 Applying schema..."
-  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$SCHEMA_FILE"
-
-  # Single transaction: either every policy lands or none does, so the
-  # database is never left half-open.
-  echo "==> 2/2 Applying security policies..."
-  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f "$SECURITY_FILE"
-  return 0
-}
 
 # Anonymous requests must be rejected. A 200 here means data is exposed.
 SENSITIVE_TABLES=(
@@ -98,37 +75,20 @@ verify_anon_denied() {
   if (( failures > 0 )); then
     echo
     echo "==> ${failures} table(s) still readable anonymously." >&2
-    echo "    Run supabase/security_hardening.sql, then re-run this script." >&2
+    echo "    Apply the pending versioned migrations, then re-run this script." >&2
     return 1
   fi
   echo "==> All checked tables deny anonymous reads."
 }
-
-if apply_sql; then
-  echo "==> SQL applied."
-else
-  cat <<'EOF'
-==> Could not auto-apply DDL (no SUPABASE_DB_URL / psql).
-
-Do this in Supabase Dashboard → SQL Editor:
-  See supabase/APPLY_ORDER.md for the full feature-pack list.
-  Minimum:
-  1. supabase/schema.sql
-  2. Feature packs you need (expense categories, invoice/proposal status, …)
-  3. supabase/security_hardening.sql  (always last)
-
-Then re-run this script to verify anonymous access is denied.
-EOF
-fi
 
 verify_anon_denied
 
 cat <<'EOF'
 
 ==> Next steps
-  - Full runbook: supabase/APPLY_ORDER.md
+  - Migration policy: supabase/MIGRATIONS.md
   - Inspect grants / RLS / policies / function ACLs: run
-    supabase/security_verification.sql in the SQL Editor. Checks 1, 2, 3, 7, 8
+    supabase/legacy/manual/security_verification.sql in the SQL Editor. Checks 1, 2, 3, 7, 8
     and 9 must return zero rows; the rest are inventories with the expected
     result noted above each query.
   - Create users in Authentication → Users. A public.users row is created

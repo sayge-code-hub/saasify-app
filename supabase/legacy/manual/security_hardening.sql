@@ -634,7 +634,7 @@ begin
     own_row := 'false';
     own_editable := 'false';
     raise warning using message =
-      'expenses.created_by missing: expenses are now STAFF-ONLY (employees cannot see or file their own claims). Apply fix_rbac_policies.sql, then re-run this file.';
+      'expenses.created_by missing: expenses are now STAFF-ONLY. Apply the current operations migration sequence in APPLY_ORDER.md, then re-run this file.';
   else
     own_row := 'created_by = auth.uid()';
     own_editable := case
@@ -870,7 +870,7 @@ begin
       )$clause$;
   elsif to_regclass('public.expenses') is not null then
     raise warning using message =
-      'expenses.receipt_path and/or expenses.created_by missing: expense receipts in the documents bucket are now STAFF-ONLY. Apply ops_completeness_pack.sql and fix_rbac_policies.sql, then re-run this file.';
+      'expenses.receipt_path and/or expenses.created_by missing: expense receipts are now STAFF-ONLY. Apply the current operations migration sequence in APPLY_ORDER.md, then re-run this file.';
   end if;
 
   execute format($pol$

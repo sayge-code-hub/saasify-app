@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../features/auth/presentation/pages/google_onboarding_page.dart';
 import '../../features/auth/presentation/pages/set_password_page.dart';
 import '../../features/auth/presentation/pages/signup_page.dart';
 import '../../features/dms/presentation/pages/dms_page.dart';
@@ -48,6 +50,7 @@ import '../../features/settings/presentation/pages/invite_employee_page.dart';
 import '../../features/settings/presentation/pages/ledger_page.dart';
 import '../../features/settings/presentation/pages/manage_clients_page.dart';
 import '../../features/settings/presentation/pages/manage_invites_page.dart';
+import '../../features/settings/presentation/pages/platform_modules_page.dart';
 import '../../features/settings/presentation/pages/roles_page.dart';
 import '../../features/settings/presentation/pages/settings_hub_page.dart';
 import '../../features/settings/presentation/pages/expense_categories_page.dart';
@@ -157,6 +160,8 @@ GoRouter createAppRouter(AuthSession authSession) {
       final loggedIn = authSession.isAuthenticated;
       final loggingIn = location == AppRoutes.login;
       final signingUp = location == AppRoutes.signup;
+      final forgotPassword = location == AppRoutes.forgotPassword;
+      final googleOnboarding = location == AppRoutes.googleOnboarding;
       final settingPassword = location == AppRoutes.setPassword;
       final atRoot = location == AppRoutes.root;
       final user = authSession.user;
@@ -168,7 +173,12 @@ GoRouter createAppRouter(AuthSession authSession) {
 
       // Invitees may already have a Supabase session before AuthSession profile
       // is loaded — never bounce them off set-password.
-      if (!loggedIn && !loggingIn && !signingUp && !settingPassword) {
+      if (!loggedIn &&
+          !loggingIn &&
+          !signingUp &&
+          !forgotPassword &&
+          !googleOnboarding &&
+          !settingPassword) {
         return AppRoutes.login;
       }
       if (loggedIn && user != null && !authSession.needsPasswordSetup) {
@@ -197,6 +207,20 @@ GoRouter createAppRouter(AuthSession authSession) {
       GoRoute(
         path: AppRoutes.signup,
         pageBuilder: (context, state) => _page(state, const SignupPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        pageBuilder: (context, state) => _page(
+          state,
+          ForgotPasswordPage(
+            initialEmail: state.uri.queryParameters['email'] ?? '',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.googleOnboarding,
+        pageBuilder: (context, state) =>
+            _page(state, const GoogleOnboardingPage()),
       ),
       GoRoute(
         path: AppRoutes.setPassword,
@@ -228,6 +252,11 @@ GoRouter createAppRouter(AuthSession authSession) {
           return HomeShell(user: user, location: location, child: child);
         },
         routes: [
+          GoRoute(
+            path: AppRoutes.platformModules,
+            pageBuilder: (context, state) =>
+                _page(state, const PlatformModulesPage()),
+          ),
           GoRoute(
             path: AppRoutes.dashboard,
             pageBuilder: (context, state) => _page(

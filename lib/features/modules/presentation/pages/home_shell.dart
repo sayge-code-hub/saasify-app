@@ -7,6 +7,7 @@ import '../../../../core/billing/billing_access.dart';
 import '../../../../core/billing/billing_models.dart';
 import '../../../../core/layout/app_destination.dart';
 import '../../../../core/layout/app_shell.dart';
+import '../../../../core/modules/module_access.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_accent.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -57,9 +58,12 @@ class _HomeShellState extends State<HomeShell> {
       _clientsBloc = sl<ClientsBloc>()..add(const ClientsRequested());
     }
     sl<BillingAccess>().refresh();
+    sl<ModuleAccess>().refresh();
   }
 
   BillingAccess get _billing => sl<BillingAccess>();
+
+  ModuleAccess get _modules => sl<ModuleAccess>();
 
   @override
   void dispose() {
@@ -71,44 +75,50 @@ class _HomeShellState extends State<HomeShell> {
   List<AppNavSection> get _sections {
     if (_isStaff) {
       return [
-        const AppNavSection(
-          label: 'HRMS',
-          icon: Icons.groups_outlined,
-          selectable: true,
-          items: [
-            AppNavItem(label: 'All Employees', icon: Icons.people_outline),
-            AppNavItem(
-              label: 'Add Employee',
-              icon: Icons.person_add_alt_1_outlined,
-            ),
-          ],
-        ),
-        const AppNavSection(
-          label: 'DMS',
-          icon: Icons.folder_outlined,
-          selectable: true,
-          items: [],
-        ),
-        const AppNavSection(
-          label: 'Finances',
-          icon: Icons.account_balance_wallet_outlined,
-          selectable: false,
-          items: [
-            AppNavItem(label: 'Payroll', icon: Icons.payments_outlined),
-            AppNavItem(
-              label: 'Profitability',
-              icon: Icons.trending_up_outlined,
-            ),
-            AppNavItem(label: 'Proposals', icon: Icons.request_quote_outlined),
-            AppNavItem(label: 'Invoices', icon: Icons.receipt_long_outlined),
-            AppNavItem(
-              label: 'Expense',
-              icon: Icons.account_balance_outlined,
-              iconAsset: 'assets/images/nav_expense.png',
-            ),
-          ],
-        ),
-        if (_billing.posEnabled)
+        if (_modules.isEnabled(SaasifyModule.hrms))
+          const AppNavSection(
+            label: 'HRMS',
+            icon: Icons.groups_outlined,
+            selectable: true,
+            items: [
+              AppNavItem(label: 'All Employees', icon: Icons.people_outline),
+              AppNavItem(
+                label: 'Add Employee',
+                icon: Icons.person_add_alt_1_outlined,
+              ),
+            ],
+          ),
+        if (_modules.isEnabled(SaasifyModule.dms))
+          const AppNavSection(
+            label: 'DMS',
+            icon: Icons.folder_outlined,
+            selectable: true,
+            items: [],
+          ),
+        if (_modules.isEnabled(SaasifyModule.finances))
+          const AppNavSection(
+            label: 'Finances',
+            icon: Icons.account_balance_wallet_outlined,
+            selectable: false,
+            items: [
+              AppNavItem(label: 'Payroll', icon: Icons.payments_outlined),
+              AppNavItem(
+                label: 'Profitability',
+                icon: Icons.trending_up_outlined,
+              ),
+              AppNavItem(
+                label: 'Proposals',
+                icon: Icons.request_quote_outlined,
+              ),
+              AppNavItem(label: 'Invoices', icon: Icons.receipt_long_outlined),
+              AppNavItem(
+                label: 'Expense',
+                icon: Icons.account_balance_outlined,
+                iconAsset: 'assets/images/nav_expense.png',
+              ),
+            ],
+          ),
+        if (_modules.isEnabled(SaasifyModule.pos) && _billing.posEnabled)
           const AppNavSection(
             label: 'POS',
             icon: Icons.storefront_outlined,
@@ -125,79 +135,90 @@ class _HomeShellState extends State<HomeShell> {
     }
 
     if (_isCafeRole) {
-      return const [
-        AppNavSection(
-          label: 'POS',
-          icon: Icons.storefront_outlined,
-          selectable: true,
-          items: [],
-        ),
+      return [
+        if (_modules.isEnabled(SaasifyModule.pos))
+          const AppNavSection(
+            label: 'POS',
+            icon: Icons.storefront_outlined,
+            selectable: true,
+            items: [],
+          ),
       ];
     }
 
     final linked = _employeeLinked;
     return [
-      const AppNavSection(
-        label: 'Dashboard',
-        icon: Icons.dashboard_outlined,
-        selectable: true,
-        items: [],
-      ),
-      AppNavSection(
-        label: 'Salary Slips',
-        icon: Icons.payments_outlined,
-        selectable: linked,
-        enabled: linked,
-        items: const [],
-      ),
-      AppNavSection(
-        label: 'Pay & Compliance',
-        icon: Icons.account_balance_wallet_outlined,
-        selectable: linked,
-        enabled: linked,
-        items: const [],
-      ),
-      AppNavSection(
-        label: 'Expense',
-        icon: Icons.account_balance_outlined,
-        iconAsset: 'assets/images/nav_expense.png',
-        selectable: linked,
-        enabled: linked,
-        items: const [],
-      ),
+      if (_modules.isEnabled(SaasifyModule.hrms))
+        const AppNavSection(
+          label: 'Dashboard',
+          icon: Icons.dashboard_outlined,
+          selectable: true,
+          items: [],
+        ),
+      if (_modules.isEnabled(SaasifyModule.hrms))
+        AppNavSection(
+          label: 'Salary Slips',
+          icon: Icons.payments_outlined,
+          selectable: linked,
+          enabled: linked,
+          items: const [],
+        ),
+      if (_modules.isEnabled(SaasifyModule.hrms))
+        AppNavSection(
+          label: 'Pay & Compliance',
+          icon: Icons.account_balance_wallet_outlined,
+          selectable: linked,
+          enabled: linked,
+          items: const [],
+        ),
+      if (_modules.isEnabled(SaasifyModule.finances))
+        AppNavSection(
+          label: 'Expense',
+          icon: Icons.account_balance_outlined,
+          iconAsset: 'assets/images/nav_expense.png',
+          selectable: linked,
+          enabled: linked,
+          items: const [],
+        ),
     ];
   }
 
   List<String> get _paths {
     if (_isStaff) {
       return [
-        AppRoutes.hrms,
-        AppRoutes.employees,
-        AppRoutes.employeesAdd,
-        AppRoutes.dms,
-        AppRoutes.payroll,
-        AppRoutes.profitability,
-        AppRoutes.proposals,
-        AppRoutes.invoices,
-        AppRoutes.expenses,
-        if (_billing.posEnabled) AppRoutes.pos,
+        if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.hrms,
+        if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.employees,
+        if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.employeesAdd,
+        if (_modules.isEnabled(SaasifyModule.dms)) AppRoutes.dms,
+        if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.payroll,
+        if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.profitability,
+        if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.proposals,
+        if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.invoices,
+        if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.expenses,
+        if (_modules.isEnabled(SaasifyModule.pos) && _billing.posEnabled)
+          AppRoutes.pos,
         AppRoutes.settings,
       ];
     }
 
     if (_isCafeRole) {
-      return const [AppRoutes.pos];
+      return _modules.isEnabled(SaasifyModule.pos)
+          ? const [AppRoutes.pos]
+          : const [];
     }
 
     final id = widget.user.employeeId?.trim();
     if (id == null || id.isEmpty) {
-      return const [AppRoutes.dashboard];
+      return _modules.isEnabled(SaasifyModule.hrms)
+          ? const [AppRoutes.dashboard]
+          : const [];
     }
     return [
-      AppRoutes.dashboard,
-      AppRoutes.dashboardSlips,
-      AppRoutes.employeeCompensation(id),
-      AppRoutes.expenses,
+      if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.dashboard,
+      if (_modules.isEnabled(SaasifyModule.hrms)) AppRoutes.dashboardSlips,
+      if (_modules.isEnabled(SaasifyModule.hrms))
+        AppRoutes.employeeCompensation(id),
+      if (_modules.isEnabled(SaasifyModule.finances)) AppRoutes.expenses,
     ];
   }
 
@@ -205,15 +226,24 @@ class _HomeShellState extends State<HomeShell> {
     final location = widget.location;
     final paths = _paths;
 
+    if (paths.isEmpty) return 0;
+
     if (_isCafeRole) {
       return 0;
     }
 
     if (!_isStaff) {
-      if (location.startsWith(AppRoutes.expenses)) return 3;
-      if (location.contains('/compensation')) return 2;
-      if (location.contains('section=slips')) return 1;
-      return 0;
+      if (location.startsWith(AppRoutes.expenses)) {
+        return paths.indexOf(AppRoutes.expenses);
+      }
+      if (location.contains('/compensation')) {
+        return paths.indexWhere((path) => path.contains('/compensation'));
+      }
+      if (location.contains('section=slips')) {
+        return paths.indexOf(AppRoutes.dashboardSlips);
+      }
+      final dashboard = paths.indexOf(AppRoutes.dashboard);
+      return dashboard >= 0 ? dashboard : 0;
     }
 
     if (location.startsWith(AppRoutes.settings)) {
@@ -585,9 +615,9 @@ class _HomeShellState extends State<HomeShell> {
                 child: Text(
                   message,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               if (_isStaff)
@@ -610,7 +640,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final accent = AppAccent.of(context);
     return ListenableBuilder(
-      listenable: _billing,
+      listenable: Listenable.merge([_billing, _modules]),
       builder: (context, _) {
         final banner = _billingBanner(_billing.snapshot);
         return MultiBlocProvider(

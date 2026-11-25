@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/auth/app_access.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/observability/operational_log.dart';
 import '../../../../core/storage/app_storage_urls.dart';
 import '../../domain/entities/expense.dart';
 import '../models/expense_model.dart';
@@ -282,7 +283,9 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       } on PostgrestException catch (e) {
         try {
           await _client.storage.from(_bucket).remove([path]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Clean up failed receipt upload', error, stackTrace);
+        }
         throw ServerException(e.message);
       }
     } on StorageException catch (e) {

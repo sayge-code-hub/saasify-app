@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/observability/operational_log.dart';
 import '../../../../core/storage/app_storage_urls.dart';
 import '../../domain/entities/dms_entity.dart';
 import '../models/document_model.dart';
@@ -257,7 +258,9 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
     } on PostgrestException catch (e) {
       try {
         await _client.storage.from(_bucket).remove([path]);
-      } catch (_) {}
+      } catch (error, stackTrace) {
+        reportRecoverableFailure('Clean up failed document upload', error, stackTrace);
+      }
       throw ServerException(e.message);
     } catch (e) {
       if (e is ServerException) rethrow;
@@ -308,7 +311,9 @@ class DocumentRemoteDataSourceImpl implements DocumentRemoteDataSource {
       if (path.isNotEmpty) {
         try {
           await _client.storage.from(_bucket).remove([path]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Remove deleted document file', error, stackTrace);
+        }
       }
     } on PostgrestException catch (e) {
       throw ServerException(e.message);

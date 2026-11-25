@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/observability/operational_log.dart';
 import '../../domain/entities/cafe_entities.dart';
 import '../models/cafe_models.dart';
 
@@ -291,7 +292,9 @@ class CafePosRemoteDataSourceImpl implements CafePosRemoteDataSource {
       if (previous.isNotEmpty && previous != path) {
         try {
           await _client.storage.from(_brandLogosBucket).remove([previous]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Remove replaced cafe logo', error, stackTrace);
+        }
       }
 
       return CafeModel.fromJson(row);
@@ -334,7 +337,9 @@ class CafePosRemoteDataSourceImpl implements CafePosRemoteDataSource {
       if (previous.isNotEmpty) {
         try {
           await _client.storage.from(_brandLogosBucket).remove([previous]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Remove cleared cafe logo', error, stackTrace);
+        }
       }
 
       return CafeModel.fromJson(row);

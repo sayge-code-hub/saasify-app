@@ -2,6 +2,8 @@
 abstract final class AppRoutes {
   static const login = '/login';
   static const signup = '/signup';
+  static const forgotPassword = '/forgot-password';
+  static const googleOnboarding = '/google-onboarding';
   static const root = '/';
   static const hrms = '/hrms';
 
@@ -38,7 +40,14 @@ abstract final class AppRoutes {
   static const inviteEmployee = '/settings/invite';
   static const manageInvites = '/settings/invites';
   static const billing = '/settings/billing';
+  static const platformModules = '/settings/modules';
   static const setPassword = '/set-password';
+
+  static String forgotPasswordWithEmail(String email) {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) return forgotPassword;
+    return '$forgotPassword?email=${Uri.encodeQueryComponent(trimmed)}';
+  }
 
   /// Curated release notes (tap the version label).
   static const whatsNew = '/whats-new';

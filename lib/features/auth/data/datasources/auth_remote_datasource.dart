@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/error/exceptions.dart' as core;
+import '../../../../core/observability/operational_log.dart';
 import '../../../../core/storage/app_storage_urls.dart';
 import '../models/user_model.dart';
 
@@ -202,7 +203,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (previous.isNotEmpty && previous != path) {
         try {
           await _client.storage.from(_bucket).remove([previous]);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Remove replaced profile avatar', error, stackTrace);
+        }
       }
       return await _fetchProfile(authUser.id);
     } on StorageException catch (e) {
@@ -263,7 +266,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               path: photoPath,
             );
           }
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          reportRecoverableFailure('Clean up failed profile avatar upload', error, stackTrace);
+        }
       }
     }
 

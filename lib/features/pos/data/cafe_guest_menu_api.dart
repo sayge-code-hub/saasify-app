@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/error/exceptions.dart';
+import '../../../core/observability/operational_log.dart';
 import '../../../core/storage/app_storage_urls.dart';
 import '../domain/entities/cafe_entities.dart';
 
@@ -255,7 +256,9 @@ Map<String, dynamic>? _asStringKeyedMap(Object? raw) {
     try {
       final decoded = jsonDecode(trimmed);
       if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      reportRecoverableFailure('Parse guest-menu JSON configuration', error, stackTrace);
+    }
   }
   return null;
 }

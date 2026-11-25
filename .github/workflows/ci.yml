@@ -11,6 +11,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  migration-safety:
+    name: Migration safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce versioned SQL only
+        run: |
+          test -d supabase/migrations
+          test -n "$(find supabase/migrations -maxdepth 1 -name '*.sql' -print -quit)"
+          test -z "$(find supabase -maxdepth 1 -name '*.sql' -print -quit)"
+          ! rg -n --glob '*.sql' '^[[:space:]]*(delete[[:space:]]+from|truncate)[[:space:]]' supabase/migrations
+
   test:
     name: Analyze & test
     runs-on: ubuntu-latest
