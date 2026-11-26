@@ -18,6 +18,7 @@ import '../../../../core/widgets/app_sticky_actions.dart';
 import '../../../../injection_container.dart';
 import '../../../hrms/domain/entities/employee.dart';
 import '../../../hrms/presentation/widgets/employee_avatar.dart';
+import '../../../settings/presentation/widgets/client_name_label.dart';
 import '../../../settings/domain/usecases/settings_usecases.dart';
 import '../../data/payslip_pdf_builder.dart';
 import '../../domain/services/payslip_calculator.dart';
@@ -463,30 +464,33 @@ class _EmployeeRow extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              '${employee.employeeId} · ${employee.designation}',
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontSize: 12,
-                                color: AppColors.textLight,
-                              ),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '${employee.employeeId} · ${employee.designation} ·',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      fontSize: 12,
+                                      color: AppColors.textLight,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: ClientNameLabel(
+                                    name: employee.client,
+                                    logoRadius: 8,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      fontSize: 12,
+                                      color: AppColors.textLight,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            employee.client,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontSize: 12,
-                              color: AppColors.textLight,
-                            ),
-                          ),
                         ),
                       ),
                     ],

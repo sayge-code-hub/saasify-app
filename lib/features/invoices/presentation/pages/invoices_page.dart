@@ -235,6 +235,8 @@ class _InvoiceListState extends State<_InvoiceList> {
                     ),
                   ),
                 )
+              : isDesktop
+              ? _InvoiceTable(invoices: invoices, dateFormat: dateFormat)
               : ListView.separated(
                   padding: EdgeInsets.fromLTRB(
                     isDesktop ? 32 : 16,
@@ -359,6 +361,107 @@ class _InvoiceListState extends State<_InvoiceList> {
         ),
         if (!isDesktop) AppStickyActions(children: [newInvoice]),
       ],
+    );
+  }
+}
+
+class _InvoiceTable extends StatelessWidget {
+  const _InvoiceTable({required this.invoices, required this.dateFormat});
+
+  final List<Invoice> invoices;
+  final DateFormat dateFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 12, 32, 32),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: MediaQuery.sizeOf(context).width - 248 - 64,
+            ),
+            child: DataTable(
+              showCheckboxColumn: false,
+              headingRowHeight: 48,
+              dataRowMinHeight: 56,
+              dataRowMaxHeight: 64,
+              horizontalMargin: 20,
+              columnSpacing: 28,
+              dividerThickness: .6,
+              headingTextStyle: textTheme.labelLarge?.copyWith(
+                color: AppColors.textLight,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: .5,
+              ),
+              dataTextStyle: textTheme.bodyLarge?.copyWith(fontSize: 13),
+              columns: const [
+                DataColumn(label: Text('INVOICE NO.')),
+                DataColumn(label: Text('DATE')),
+                DataColumn(label: Text('CLIENT')),
+                DataColumn(label: Text('P.O. NUMBER')),
+                DataColumn(label: Text('TOTAL')),
+                DataColumn(label: Text('PAYMENT STATUS')),
+                DataColumn(label: Text('ACTIONS')),
+              ],
+              rows: invoices.map((invoice) {
+                final party = invoice.buyerCompany.isNotEmpty
+                    ? invoice.buyerCompany
+                    : invoice.buyerName;
+                return DataRow(
+                  onSelectChanged: (_) => showInvoicePreview(
+                    context: context,
+                    invoice: invoice,
+                    onEdit: () => context.read<InvoicesBloc>().add(
+                      InvoiceEditOpened(invoice),
+                    ),
+                    onClone: () => context.read<InvoicesBloc>().add(
+                      InvoiceCloneOpened(invoice),
+                    ),
+                  ),
+                  cells: [
+                    DataCell(
+                      Text(
+                        invoice.invoiceNo,
+                        style: textTheme.titleMedium?.copyWith(fontSize: 13),
+                      ),
+                    ),
+                    DataCell(Text(dateFormat.format(invoice.invoiceDate))),
+                    DataCell(
+                      ClientNameLabel(
+                        name: party,
+                        contactName: invoice.buyerName,
+                        logoRadius: 7,
+                        style: textTheme.bodyLarge?.copyWith(fontSize: 13),
+                      ),
+                    ),
+                    DataCell(
+                      Text(invoice.poNumber.isEmpty ? '—' : invoice.poNumber),
+                    ),
+                    DataCell(Text(MoneyFormat.format(invoice.totalAmount))),
+                    DataCell(
+                      _PaymentStatusChip(
+                        status: invoice.displayPaymentStatus(),
+                      ),
+                    ),
+                    DataCell(
+                      _InvoiceRowActions(invoice: invoice, compact: true),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
