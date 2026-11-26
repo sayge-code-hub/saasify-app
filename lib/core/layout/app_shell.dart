@@ -732,6 +732,13 @@ class _CompanyBrandMarkState extends State<_CompanyBrandMark> {
     return FutureBuilder<CompanyDetails?>(
       future: _company,
       builder: (context, snapshot) {
+        // Never render the Sayge product/previous-tenant mark while the active
+        // tenant's brand is being resolved. A sidebar can be rebuilt on every
+        // left-nav transition, so a product fallback here caused a visible
+        // Sayge → tenant-logo flash for branded workspaces.
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SizedBox(width: 188, height: 42);
+        }
         final company = snapshot.data;
         final logoUrl = company?.logoUrl?.trim() ?? '';
         final displayName = company?.displayName.trim().isNotEmpty == true
