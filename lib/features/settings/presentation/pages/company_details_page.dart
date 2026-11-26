@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/branding/company_branding.dart';
 import '../../../../core/layout/breakpoints.dart';
@@ -56,71 +56,112 @@ class _CompanyDetailsBodyState extends State<_CompanyDetailsBody> {
 
   Future<void> _pickAndUploadLogo(CompanyDetails details) async {
     if (_uploadingLogo) return;
-    final source = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (source == null || !mounted) return;
+    try {
+      // FilePicker supplies bytes on web and native platforms consistently.
+      // The earlier ImagePicker-only route could stop before upload when a
+      // browser did not support ImageCropper's native dialog.
+      final files = await FilePicker.pickFiles(type: FileType.image);
+      if (files.isEmpty || !mounted) return;
+      final selected = files.first;
+      final originalBytes = await selected.readAsBytes();
+      if (originalBytes.isEmpty) {
+        throw StateError('The selected image could not be read.');
+      }
 
-    final cropped = await ImageCropper().cropImage(
-      sourcePath: source.path,
-      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-      maxWidth: 1024,
-      maxHeight: 1024,
-      compressFormat: ImageCompressFormat.jpg,
-      compressQuality: 92,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop company logo',
-          toolbarColor: AppColors.text,
-          toolbarWidgetColor: AppColors.background,
-          lockAspectRatio: true,
-          hideBottomControls: true,
-          cropStyle: CropStyle.rectangle,
-        ),
-        IOSUiSettings(
-          title: 'Crop company logo',
-          aspectRatioLockEnabled: true,
-          resetAspectRatioEnabled: false,
-          rotateButtonsHidden: false,
-        ),
-        WebUiSettings(
-          context: context,
-          presentStyle: WebPresentStyle.dialog,
-          size: const CropperSize(width: 520, height: 520),
-          viewMode: WebViewMode.mode_3,
-          dragMode: WebDragMode.move,
-          initialAspectRatio: 1,
-          cropBoxResizable: false,
-        ),
-      ],
-    );
-    if (cropped == null || !mounted) return;
-    final bytes = await cropped.readAsBytes();
-    if (bytes.isEmpty || !mounted) return;
+      var bytes = originalBytes;
+      var fileName = selected.name;
+      var mimeType = _mimeFor(selected.extension, selected.name);
 
-    setState(() => _uploadingLogo = true);
-    final result = await sl<UpdateCompanyLogoUseCase>()(
-      companyId: details.id,
-      bytes: bytes,
-      fileName: 'company_logo.jpg',
-      mimeType: 'image/jpeg',
-    );
-    if (!mounted) return;
-    setState(() => _uploadingLogo = false);
+      // Native platforms can crop from a local file path. On web, paths are
+      // not stable files, so retaining the original still produces a square,
+      // cover-fitted logo without blocking the upload.
+      final localPath = selected.path;
+      if (localPath != null && localPath.isNotEmpty) {
+        try {
+          final cropped = await ImageCropper().cropImage(
+            sourcePath: localPath,
+            aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+            maxWidth: 1024,
+            maxHeight: 1024,
+            compressFormat: ImageCompressFormat.jpg,
+            compressQuality: 92,
+            uiSettings: [
+              AndroidUiSettings(
+                toolbarTitle: 'Crop company logo',
+                toolbarColor: AppColors.text,
+                toolbarWidgetColor: AppColors.background,
+                lockAspectRatio: true,
+                hideBottomControls: true,
+                cropStyle: CropStyle.rectangle,
+              ),
+              IOSUiSettings(
+                title: 'Crop company logo',
+                aspectRatioLockEnabled: true,
+                resetAspectRatioEnabled: false,
+                rotateButtonsHidden: false,
+              ),
+            ],
+          );
+          if (cropped != null) {
+            bytes = await cropped.readAsBytes();
+            fileName = 'company_logo.jpg';
+            mimeType = 'image/jpeg';
+          }
+        } catch (_) {
+          // Upload the selected image when cropping is unavailable. The
+          // square preview/sidebar use BoxFit.cover, so it remains well-fit.
+        }
+      }
+      if (bytes.isEmpty || !mounted) return;
 
-    await result.fold(
-      (failure) => showAppMessageDialog(
+      setState(() => _uploadingLogo = true);
+      final result = await sl<UpdateCompanyLogoUseCase>()(
+        companyId: details.id,
+        bytes: bytes,
+        fileName: fileName,
+        mimeType: mimeType,
+      );
+      if (!mounted) return;
+      setState(() => _uploadingLogo = false);
+
+      await result.fold(
+        (failure) => showAppMessageDialog(
+          context,
+          title: 'Company logo',
+          message: failure.message,
+        ),
+        (updated) async {
+          context.read<CompanyDetailsBloc>().add(
+            CompanyDetailsLogoUpdated(updated),
+          );
+          CompanyBranding.refresh();
+          if (!mounted) return;
+          await showAppMessageDialog(context, message: 'Company logo updated');
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _uploadingLogo = false);
+      await showAppMessageDialog(
         context,
         title: 'Company logo',
-        message: failure.message,
-      ),
-      (updated) async {
-        context.read<CompanyDetailsBloc>().add(
-          CompanyDetailsLogoUpdated(updated),
-        );
-        CompanyBranding.refresh();
-        if (!mounted) return;
-        await showAppMessageDialog(context, message: 'Company logo updated');
-      },
-    );
+        message:
+            'Could not prepare that image. Please select a PNG, JPG, or WebP file.',
+      );
+    }
+  }
+
+  static String _mimeFor(String? extension, String fileName) {
+    final ext = (extension ?? '').toLowerCase();
+    final normalized = ext.isNotEmpty
+        ? ext
+        : fileName.split('.').last.toLowerCase();
+    return switch (normalized) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      _ => 'image/jpeg',
+    };
   }
 
   @override
