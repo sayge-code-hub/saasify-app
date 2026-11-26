@@ -114,7 +114,7 @@ class _DesktopShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       body: Row(
         children: [
           _Sidebar(
@@ -126,7 +126,7 @@ class _DesktopShell extends StatelessWidget {
           ),
           Expanded(
             child: ColoredBox(
-              color: AppColors.surface,
+              color: AppColors.background,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -191,7 +191,7 @@ class _MobileShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         toolbarHeight: 72,
         titleSpacing: onBack == null ? 0 : NavigationToolbar.kMiddleSpacing,
@@ -208,7 +208,7 @@ class _MobileShell extends StatelessWidget {
         actions: [...?actions, const SizedBox(width: 8)],
       ),
       drawer: Drawer(
-        backgroundColor: AppColors.surfaceMuted,
+        backgroundColor: AppColors.background,
         child: SafeArea(
           child: _Sidebar(
             user: user,
@@ -237,8 +237,12 @@ class _DesktopHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 32, 8),
+    return Container(
+      height: AppShell.logoBandHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -366,7 +370,7 @@ class _SidebarState extends State<_Sidebar> {
     return Container(
       width: widget.compact ? 248 : null,
       decoration: const BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: AppColors.background,
         border: Border(right: BorderSide(color: AppColors.border, width: 1)),
       ),
       child: Column(

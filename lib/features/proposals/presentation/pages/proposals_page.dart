@@ -51,11 +51,7 @@ class _ProposalsBody extends StatelessWidget {
       listener: (context, state) {
         final message = state.errorMessage;
         if (message != null) {
-          showAppMessageDialog(
-            context,
-            title: 'Proposals',
-            message: message,
-          );
+          showAppMessageDialog(context, title: 'Proposals', message: message);
         }
       },
       builder: (context, state) {
@@ -70,7 +66,9 @@ class _ProposalsBody extends StatelessWidget {
 
         if (state.view == ProposalsView.form) {
           return _ProposalFormView(
-            key: ValueKey('proposal-form-${state.editingId ?? state.referenceNo}'),
+            key: ValueKey(
+              'proposal-form-${state.editingId ?? state.referenceNo}',
+            ),
             state: state,
           );
         }
@@ -126,9 +124,9 @@ class _ProposalListState extends State<_ProposalList> {
       label: isDesktop ? 'Download all' : 'Download all ($downloadableCount)',
       expand: !isDesktop,
       enabled: downloadableCount > 0,
-      onPressed: () => context
-          .read<ProposalsBloc>()
-          .add(const ProposalDownloadAllRequested()),
+      onPressed: () => context.read<ProposalsBloc>().add(
+        const ProposalDownloadAllRequested(),
+      ),
     );
 
     return Column(
@@ -168,50 +166,225 @@ class _ProposalListState extends State<_ProposalList> {
                   child: Text(
                     'No proposals yet.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textLight,
-                        ),
+                      color: AppColors.textLight,
+                    ),
                   ),
                 )
               : proposals.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No matching proposals.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textLight,
-                            ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: EdgeInsets.fromLTRB(
-                        isDesktop ? 32 : 16,
-                        16,
-                        isDesktop ? 32 : 16,
-                        24,
-                      ),
-                      itemCount: proposals.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final proposal = proposals[index];
-                        return _ProposalCard(
-                          proposal: proposal,
-                          statusUpdating: widget.state
-                              .isStatusUpdating(proposal.id),
-                        );
-                      },
+              ? Center(
+                  child: Text(
+                    'No matching proposals.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textLight,
                     ),
+                  ),
+                )
+              : isDesktop
+              ? _ProposalTable(
+                  proposals: proposals,
+                  statusUpdating: widget.state.isStatusUpdating,
+                )
+              : ListView.separated(
+                  padding: EdgeInsets.fromLTRB(
+                    isDesktop ? 32 : 16,
+                    16,
+                    isDesktop ? 32 : 16,
+                    24,
+                  ),
+                  itemCount: proposals.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final proposal = proposals[index];
+                    return _ProposalCard(
+                      proposal: proposal,
+                      statusUpdating: widget.state.isStatusUpdating(
+                        proposal.id,
+                      ),
+                    );
+                  },
+                ),
         ),
-        if (!isDesktop)
-          AppStickyActions(children: [downloadAll, newProposal]),
+        if (!isDesktop) AppStickyActions(children: [downloadAll, newProposal]),
       ],
     );
   }
 }
 
+class _ProposalTable extends StatelessWidget {
+  const _ProposalTable({required this.proposals, required this.statusUpdating});
+
+  final List<Proposal> proposals;
+  final bool Function(String proposalId) statusUpdating;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 12, 32, 32),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: MediaQuery.sizeOf(context).width - 248 - 64,
+            ),
+            child: DataTable(
+              showCheckboxColumn: false,
+              headingRowHeight: 48,
+              dataRowMinHeight: 56,
+              dataRowMaxHeight: 64,
+              horizontalMargin: 20,
+              columnSpacing: 28,
+              dividerThickness: .6,
+              headingTextStyle: textTheme.labelLarge?.copyWith(
+                color: AppColors.textLight,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: .5,
+              ),
+              dataTextStyle: textTheme.bodyLarge?.copyWith(fontSize: 13),
+              columns: const [
+                DataColumn(label: Text('PROPOSAL NO.')),
+                DataColumn(label: Text('DATE')),
+                DataColumn(label: Text('CLIENT')),
+                DataColumn(label: Text('VALID UNTIL')),
+                DataColumn(label: Text('AMOUNT')),
+                DataColumn(label: Text('STATUS')),
+                DataColumn(label: Text('ACTIONS')),
+              ],
+              rows: proposals.map((proposal) {
+                final party = proposal.billToCompany.isNotEmpty
+                    ? proposal.billToCompany
+                    : proposal.billToName;
+                final updating = statusUpdating(proposal.id);
+                return DataRow(
+                  onSelectChanged: (_) => showProposalPreview(
+                    context: context,
+                    proposal: proposal,
+                    onEdit: () => context.read<ProposalsBloc>().add(
+                      ProposalEditOpened(proposal),
+                    ),
+                    onClone: () => context.read<ProposalsBloc>().add(
+                      ProposalCloneOpened(proposal),
+                    ),
+                    onConvertToInvoice: () =>
+                        openInvoiceFromProposal(context, proposal),
+                  ),
+                  cells: [
+                    DataCell(
+                      Text(
+                        proposal.referenceNo,
+                        style: textTheme.titleMedium?.copyWith(fontSize: 13),
+                      ),
+                    ),
+                    DataCell(Text(AppDates.medium.format(proposal.quoteDate))),
+                    DataCell(
+                      ClientNameLabel(
+                        name: party,
+                        contactName: proposal.billToName,
+                        logoRadius: 7,
+                        style: textTheme.bodyLarge?.copyWith(fontSize: 13),
+                      ),
+                    ),
+                    DataCell(Text(AppDates.medium.format(proposal.expiryDate))),
+                    DataCell(Text(MoneyFormat.format(proposal.subtotal))),
+                    DataCell(
+                      updating
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : _ProposalStatusChip(status: proposal.poStatus),
+                    ),
+                    DataCell(
+                      _ProposalTableActions(
+                        proposal: proposal,
+                        updating: updating,
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProposalTableActions extends StatelessWidget {
+  const _ProposalTableActions({required this.proposal, required this.updating});
+
+  final Proposal proposal;
+  final bool updating;
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+    tooltip: 'Actions',
+    enabled: !updating,
+    onSelected: (value) {
+      switch (value) {
+        case 'activate':
+          context.read<ProposalsBloc>().add(
+            ProposalStatusChanged(
+              proposalId: proposal.id,
+              status: ProposalPoStatus.active,
+            ),
+          );
+        case 'sent':
+          context.read<ProposalsBloc>().add(
+            ProposalStatusChanged(
+              proposalId: proposal.id,
+              status: ProposalPoStatus.sent,
+            ),
+          );
+        case 'accepted':
+          context.read<ProposalsBloc>().add(
+            ProposalStatusChanged(
+              proposalId: proposal.id,
+              status: ProposalPoStatus.accepted,
+            ),
+          );
+        case 'edit':
+          context.read<ProposalsBloc>().add(ProposalEditOpened(proposal));
+        case 'clone':
+          context.read<ProposalsBloc>().add(ProposalCloneOpened(proposal));
+        case 'invoice':
+          openInvoiceFromProposal(context, proposal);
+        case 'download':
+          context.read<ProposalsBloc>().add(
+            ProposalDownloadRequested(proposal),
+          );
+      }
+    },
+    itemBuilder: (_) => [
+      if (proposal.poStatus.isMuted)
+        const PopupMenuItem(
+          value: 'activate',
+          child: Text('Restore to active'),
+        ),
+      if (proposal.poStatus == ProposalPoStatus.active)
+        const PopupMenuItem(value: 'sent', child: Text('Mark sent')),
+      if (proposal.poStatus == ProposalPoStatus.active ||
+          proposal.poStatus == ProposalPoStatus.sent)
+        const PopupMenuItem(value: 'accepted', child: Text('Mark accepted')),
+      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      const PopupMenuItem(value: 'clone', child: Text('Clone')),
+      const PopupMenuItem(value: 'invoice', child: Text('Convert to invoice')),
+      const PopupMenuItem(value: 'download', child: Text('Download PDF')),
+    ],
+  );
+}
+
 class _ProposalCard extends StatelessWidget {
-  const _ProposalCard({
-    required this.proposal,
-    this.statusUpdating = false,
-  });
+  const _ProposalCard({required this.proposal, this.statusUpdating = false});
 
   final Proposal proposal;
   final bool statusUpdating;
@@ -230,12 +403,10 @@ class _ProposalCard extends StatelessWidget {
     return showProposalPreview(
       context: context,
       proposal: proposal,
-      onEdit: () => context.read<ProposalsBloc>().add(
-            ProposalEditOpened(proposal),
-          ),
-      onClone: () => context.read<ProposalsBloc>().add(
-            ProposalCloneOpened(proposal),
-          ),
+      onEdit: () =>
+          context.read<ProposalsBloc>().add(ProposalEditOpened(proposal)),
+      onClone: () =>
+          context.read<ProposalsBloc>().add(ProposalCloneOpened(proposal)),
       onConvertToInvoice: () => openInvoiceFromProposal(context, proposal),
     );
   }
@@ -272,7 +443,9 @@ class _ProposalCard extends StatelessWidget {
                         Flexible(
                           child: Text(
                             proposal.referenceNo,
-                            style: textTheme.titleMedium?.copyWith(fontSize: 14),
+                            style: textTheme.titleMedium?.copyWith(
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -339,11 +512,11 @@ class _ProposalCard extends StatelessWidget {
                   onPressed: statusUpdating
                       ? null
                       : () => context.read<ProposalsBloc>().add(
-                            ProposalStatusChanged(
-                              proposalId: proposal.id,
-                              status: ProposalPoStatus.sent,
-                            ),
+                          ProposalStatusChanged(
+                            proposalId: proposal.id,
+                            status: ProposalPoStatus.sent,
                           ),
+                        ),
                   icon: Icons.send_outlined,
                 ),
               if (proposal.poStatus == ProposalPoStatus.active ||
@@ -356,11 +529,11 @@ class _ProposalCard extends StatelessWidget {
                   onPressed: statusUpdating
                       ? null
                       : () => context.read<ProposalsBloc>().add(
-                            ProposalStatusChanged(
-                              proposalId: proposal.id,
-                              status: ProposalPoStatus.accepted,
-                            ),
+                          ProposalStatusChanged(
+                            proposalId: proposal.id,
+                            status: ProposalPoStatus.accepted,
                           ),
+                        ),
                   icon: Icons.check_circle_outline,
                 ),
               ],
@@ -373,13 +546,12 @@ class _ProposalCard extends StatelessWidget {
                     tooltip: 'Set status',
                     padding: EdgeInsets.zero,
                     offset: const Offset(0, 28),
-                    onSelected: (status) =>
-                        context.read<ProposalsBloc>().add(
-                              ProposalStatusChanged(
-                                proposalId: proposal.id,
-                                status: status,
-                              ),
-                            ),
+                    onSelected: (status) => context.read<ProposalsBloc>().add(
+                      ProposalStatusChanged(
+                        proposalId: proposal.id,
+                        status: status,
+                      ),
+                    ),
                     itemBuilder: (context) => [
                       for (final status in ProposalPoStatus.values)
                         PopupMenuItem(
@@ -411,8 +583,8 @@ class _ProposalCard extends StatelessWidget {
                 onPressed: statusUpdating
                     ? null
                     : () => context.read<ProposalsBloc>().add(
-                          ProposalEditOpened(proposal),
-                        ),
+                        ProposalEditOpened(proposal),
+                      ),
                 icon: Icons.edit_outlined,
               ),
               const SizedBox(width: 6),
@@ -423,8 +595,8 @@ class _ProposalCard extends StatelessWidget {
                 onPressed: statusUpdating
                     ? null
                     : () => context.read<ProposalsBloc>().add(
-                          ProposalCloneOpened(proposal),
-                        ),
+                        ProposalCloneOpened(proposal),
+                      ),
                 icon: Icons.copy_outlined,
               ),
               const SizedBox(width: 6),
@@ -445,8 +617,8 @@ class _ProposalCard extends StatelessWidget {
                 onPressed: statusUpdating
                     ? null
                     : () => context.read<ProposalsBloc>().add(
-                          ProposalDownloadRequested(proposal),
-                        ),
+                        ProposalDownloadRequested(proposal),
+                      ),
                 icon: Icons.download,
               ),
             ],
@@ -489,10 +661,10 @@ class _ProposalStatusChip extends StatelessWidget {
       child: Text(
         status.label,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
@@ -550,9 +722,12 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
     _notes = TextEditingController(text: s.notes);
     _quoteDate = s.quoteDate ?? DateTime.now();
     _expiryDate = s.expiryDate ?? ProposalCalculator.defaultExpiry(_quoteDate);
-    _quoteDateCtrl = TextEditingController(text: _dateFormat.format(_quoteDate));
-    _expiryDateCtrl =
-        TextEditingController(text: _dateFormat.format(_expiryDate));
+    _quoteDateCtrl = TextEditingController(
+      text: _dateFormat.format(_quoteDate),
+    );
+    _expiryDateCtrl = TextEditingController(
+      text: _dateFormat.format(_expiryDate),
+    );
     _lines = [
       for (final line in s.draftLines)
         _LineControllers(
@@ -594,33 +769,33 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
     if (!await ensureBillingWritable(context)) return;
     if (!mounted) return;
     context.read<ProposalsBloc>().add(
-          ProposalSubmitted(
-            referenceNo: _reference.text,
-            quoteDate: _quoteDate,
-            expiryDate: _expiryDate,
-            placeOfSupply: _place.text,
-            vendorCode: _vendor.text,
-            entityCode: _entity.text,
-            billToName: _billName.text,
-            billToCompany: _billCompany.text,
-            billToAddress: _billAddress.text,
-            billToGstin: _billGstin.text,
-            shipToName: _shipName.text,
-            shipToCompany: _shipCompany.text,
-            shipToAddress: _shipAddress.text,
-            shipToGstin: _shipGstin.text,
-            notes: _notes.text,
-            lines: [
-              for (final line in _lines)
-                DraftLine(
-                  description: line.description.text,
-                  monthlyRate: line.monthlyRate.text,
-                  months: line.months.text,
-                  days: line.days.text,
-                ),
-            ],
-          ),
-        );
+      ProposalSubmitted(
+        referenceNo: _reference.text,
+        quoteDate: _quoteDate,
+        expiryDate: _expiryDate,
+        placeOfSupply: _place.text,
+        vendorCode: _vendor.text,
+        entityCode: _entity.text,
+        billToName: _billName.text,
+        billToCompany: _billCompany.text,
+        billToAddress: _billAddress.text,
+        billToGstin: _billGstin.text,
+        shipToName: _shipName.text,
+        shipToCompany: _shipCompany.text,
+        shipToAddress: _shipAddress.text,
+        shipToGstin: _shipGstin.text,
+        notes: _notes.text,
+        lines: [
+          for (final line in _lines)
+            DraftLine(
+              description: line.description.text,
+              monthlyRate: line.monthlyRate.text,
+              months: line.months.text,
+              days: line.days.text,
+            ),
+        ],
+      ),
+    );
   }
 
   Proposal _draftProposal() {
@@ -672,10 +847,7 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
   }
 
   Future<void> _preview() async {
-    await showProposalPreview(
-      context: context,
-      proposal: _draftProposal(),
-    );
+    await showProposalPreview(context: context, proposal: _draftProposal());
   }
 
   Future<void> _pickDate({required bool expiry}) async {
@@ -717,8 +889,7 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
       _billGstin.text = client.gstin;
       for (final line in _lines) {
         final selected = line.selectedEmployee;
-        if (selected != null &&
-            !_employeeMatchesClient(selected, client)) {
+        if (selected != null && !_employeeMatchesClient(selected, client)) {
           line.selectedEmployee = null;
           line.description.clear();
         }
@@ -730,10 +901,14 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
     if (employee.clientId.isNotEmpty && employee.clientId == client.id) {
       return true;
     }
-    return employee.client.trim().toLowerCase() == client.name.trim().toLowerCase();
+    return employee.client.trim().toLowerCase() ==
+        client.name.trim().toLowerCase();
   }
 
-  List<Employee> _candidatesForClient(Client? client, List<Employee> employees) {
+  List<Employee> _candidatesForClient(
+    Client? client,
+    List<Employee> employees,
+  ) {
     if (client == null) return const [];
     return employees
         .where((e) => e.isActive && _employeeMatchesClient(e, client))
@@ -903,234 +1078,239 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
         if (didPop || saving) return;
         leaveFormIfConfirmed(
           context,
-          () => context
-              .read<ProposalsBloc>()
-              .add(const ProposalListRequested()),
+          () =>
+              context.read<ProposalsBloc>().add(const ProposalListRequested()),
         );
       },
       child: Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(horizontal, 8, horizontal, 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: saving
-                  ? null
-                  : () => leaveFormIfConfirmed(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(horizontal, 8, horizontal, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: saving
+                    ? null
+                    : () => leaveFormIfConfirmed(
                         context,
-                        () => context
-                            .read<ProposalsBloc>()
-                            .add(const ProposalListRequested()),
+                        () => context.read<ProposalsBloc>().add(
+                          const ProposalListRequested(),
+                        ),
                       ),
-              icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Back to list'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.textLight),
+                icon: const Icon(Icons.arrow_back, size: 18),
+                label: const Text('Back to list'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textLight,
+                ),
+              ),
             ),
           ),
-        ),
-        const Divider(height: 1, color: AppColors.border),
-        Expanded(
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(horizontal, 16, horizontal, 32),
-            children: [
-              _card(
-                context,
-                title: 'Quote details',
-                child: _grid(isDesktop, [
-                  AppTextField(
-                    label: 'Reference No',
-                    controller: _reference,
-                    enabled: !saving,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  AppTextField(
-                    label: 'Place of Supply',
-                    controller: _place,
-                    enabled: !saving,
-                  ),
-                  AppTextField(
-                    label: 'Quote Date',
-                    controller: _quoteDateCtrl,
-                    readOnly: true,
-                    enabled: !saving,
-                    onTap: saving ? null : () => _pickDate(expiry: false),
-                  ),
-                  AppTextField(
-                    label: 'Vendor Code',
-                    controller: _vendor,
-                    enabled: !saving,
-                    hintText: 'From client or type',
-                  ),
-                  AppTextField(
-                    label: 'Expiry Date',
-                    controller: _expiryDateCtrl,
-                    readOnly: true,
-                    enabled: !saving,
-                    onTap: saving ? null : () => _pickDate(expiry: true),
-                  ),
-                  AppTextField(
-                    label: 'Entity Code',
-                    controller: _entity,
-                    enabled: !saving,
-                    hintText: 'From client or type',
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 12),
-              if (isDesktop)
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: _partyCard(
-                          context,
-                          title: 'Bill To',
-                          trailing: TextButton(
-                            onPressed: saving ? null : _copyBillToShip,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.compact,
-                              foregroundColor: AppColors.textLight,
-                              textStyle: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            child: const Text('Copy to Ship To'),
-                          ),
-                          clientValue: billClient,
-                          clients: clients,
-                          onClientChanged: saving ? null : _applyBillClient,
-                          saving: saving,
-                          name: _billName,
-                          company: _billCompany,
-                          address: _billAddress,
-                          gstin: _billGstin,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _partyCard(
-                          context,
-                          title: 'Ship To',
-                          clientValue: shipClient,
-                          clients: clients,
-                          onClientChanged: saving ? null : _applyShipClient,
-                          saving: saving,
-                          name: _shipName,
-                          company: _shipCompany,
-                          address: _shipAddress,
-                          gstin: _shipGstin,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else ...[
-                _partyCard(
+          const Divider(height: 1, color: AppColors.border),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(horizontal, 16, horizontal, 32),
+              children: [
+                _card(
                   context,
-                  title: 'Bill To',
-                  trailing: TextButton(
-                    onPressed: saving ? null : _copyBillToShip,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                      foregroundColor: AppColors.textLight,
-                      textStyle: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  title: 'Quote details',
+                  child: _grid(isDesktop, [
+                    AppTextField(
+                      label: 'Reference No',
+                      controller: _reference,
+                      enabled: !saving,
+                      onChanged: (_) => setState(() {}),
                     ),
-                    child: const Text('Copy to Ship To'),
-                  ),
-                  clientValue: billClient,
-                  clients: clients,
-                  onClientChanged: saving ? null : _applyBillClient,
-                  saving: saving,
-                  name: _billName,
-                  company: _billCompany,
-                  address: _billAddress,
-                  gstin: _billGstin,
+                    AppTextField(
+                      label: 'Place of Supply',
+                      controller: _place,
+                      enabled: !saving,
+                    ),
+                    AppTextField(
+                      label: 'Quote Date',
+                      controller: _quoteDateCtrl,
+                      readOnly: true,
+                      enabled: !saving,
+                      onTap: saving ? null : () => _pickDate(expiry: false),
+                    ),
+                    AppTextField(
+                      label: 'Vendor Code',
+                      controller: _vendor,
+                      enabled: !saving,
+                      hintText: 'From client or type',
+                    ),
+                    AppTextField(
+                      label: 'Expiry Date',
+                      controller: _expiryDateCtrl,
+                      readOnly: true,
+                      enabled: !saving,
+                      onTap: saving ? null : () => _pickDate(expiry: true),
+                    ),
+                    AppTextField(
+                      label: 'Entity Code',
+                      controller: _entity,
+                      enabled: !saving,
+                      hintText: 'From client or type',
+                    ),
+                  ]),
                 ),
                 const SizedBox(height: 12),
-                _partyCard(
+                if (isDesktop)
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _partyCard(
+                            context,
+                            title: 'Bill To',
+                            trailing: TextButton(
+                              onPressed: saving ? null : _copyBillToShip,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                                foregroundColor: AppColors.textLight,
+                                textStyle: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              child: const Text('Copy to Ship To'),
+                            ),
+                            clientValue: billClient,
+                            clients: clients,
+                            onClientChanged: saving ? null : _applyBillClient,
+                            saving: saving,
+                            name: _billName,
+                            company: _billCompany,
+                            address: _billAddress,
+                            gstin: _billGstin,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _partyCard(
+                            context,
+                            title: 'Ship To',
+                            clientValue: shipClient,
+                            clients: clients,
+                            onClientChanged: saving ? null : _applyShipClient,
+                            saving: saving,
+                            name: _shipName,
+                            company: _shipCompany,
+                            address: _shipAddress,
+                            gstin: _shipGstin,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  _partyCard(
+                    context,
+                    title: 'Bill To',
+                    trailing: TextButton(
+                      onPressed: saving ? null : _copyBillToShip,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: AppColors.textLight,
+                        textStyle: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      child: const Text('Copy to Ship To'),
+                    ),
+                    clientValue: billClient,
+                    clients: clients,
+                    onClientChanged: saving ? null : _applyBillClient,
+                    saving: saving,
+                    name: _billName,
+                    company: _billCompany,
+                    address: _billAddress,
+                    gstin: _billGstin,
+                  ),
+                  const SizedBox(height: 12),
+                  _partyCard(
+                    context,
+                    title: 'Ship To',
+                    clientValue: shipClient,
+                    clients: clients,
+                    onClientChanged: saving ? null : _applyShipClient,
+                    saving: saving,
+                    name: _shipName,
+                    company: _shipCompany,
+                    address: _shipAddress,
+                    gstin: _shipGstin,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _card(
                   context,
-                  title: 'Ship To',
-                  clientValue: shipClient,
-                  clients: clients,
-                  onClientChanged: saving ? null : _applyShipClient,
-                  saving: saving,
-                  name: _shipName,
-                  company: _shipCompany,
-                  address: _shipAddress,
-                  gstin: _shipGstin,
+                  title: 'Line items',
+                  trailing: TextButton.icon(
+                    onPressed: saving
+                        ? null
+                        : () => setState(() {
+                            _lines.add(_LineControllers.empty());
+                            context.read<ProposalsBloc>().add(
+                              const ProposalLineAdded(),
+                            );
+                          }),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add line'),
+                  ),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _lines.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 12),
+                        _buildLine(
+                          i,
+                          saving,
+                          isDesktop,
+                          candidates: candidates,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _card(
+                  context,
+                  title: AppProposalConfig.notesHeading,
+                  child: AppTextField(
+                    label: 'Notes',
+                    controller: _notes,
+                    enabled: !saving,
+                    maxLines: 6,
+                  ),
                 ),
               ],
-              const SizedBox(height: 12),
-              _card(
-                context,
-                title: 'Line items',
-                trailing: TextButton.icon(
-                  onPressed: saving
-                      ? null
-                      : () => setState(() {
-                            _lines.add(_LineControllers.empty());
-                            context
-                                .read<ProposalsBloc>()
-                                .add(const ProposalLineAdded());
-                          }),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add line'),
-                ),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < _lines.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 12),
-                      _buildLine(
-                        i,
-                        saving,
-                        isDesktop,
-                        candidates: candidates,
-                      ),
-                    ],
-                  ],
-                ),
+            ),
+          ),
+          AppStickyActions(
+            children: [
+              OutlinedButton(
+                onPressed: saving ? null : _preview,
+                child: const Text('Preview'),
               ),
-              const SizedBox(height: 12),
-              _card(
-                context,
-                title: AppProposalConfig.notesHeading,
-                child: AppTextField(
-                  label: 'Notes',
-                  controller: _notes,
-                  enabled: !saving,
-                  maxLines: 6,
-                ),
+              AppButton(
+                label: widget.state.isEditing
+                    ? 'Update proposal'
+                    : 'Save proposal',
+                isLoading: saving,
+                enabled: !saving,
+                onPressed: _submit,
               ),
             ],
           ),
-        ),
-        AppStickyActions(
-          children: [
-            OutlinedButton(
-              onPressed: saving ? null : _preview,
-              child: const Text('Preview'),
-            ),
-            AppButton(
-              label: widget.state.isEditing ? 'Update proposal' : 'Save proposal',
-              isLoading: saving,
-              enabled: !saving,
-              onPressed: _submit,
-            ),
-          ],
-        ),
-      ],
+        ],
       ),
     );
   }
@@ -1222,11 +1402,7 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
             enabled: !saving,
           ),
           const SizedBox(height: 12),
-          AppTextField(
-            label: 'Company',
-            controller: company,
-            enabled: !saving,
-          ),
+          AppTextField(label: 'Company', controller: company, enabled: !saving),
           const SizedBox(height: 12),
           AppTextField(
             label: 'Address',
@@ -1235,11 +1411,7 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
             maxLines: 3,
           ),
           const SizedBox(height: 12),
-          AppTextField(
-            label: 'GSTIN',
-            controller: gstin,
-            enabled: !saving,
-          ),
+          AppTextField(label: 'GSTIN', controller: gstin, enabled: !saving),
         ],
       ),
     );
@@ -1271,27 +1443,27 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
             children: [
               Text(
                 'Line ${index + 1}',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: AppColors.textLight,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: AppColors.textLight),
               ),
               const Spacer(),
               Text(
                 'Total ${MoneyFormat.format(total)}',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontSize: 13,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontSize: 13),
               ),
               if (_lines.length > 1)
                 IconButton(
                   onPressed: saving
                       ? null
                       : () => setState(() {
-                            _lines.removeAt(index).dispose();
-                            context
-                                .read<ProposalsBloc>()
-                                .add(ProposalLineRemoved(index));
-                          }),
+                          _lines.removeAt(index).dispose();
+                          context.read<ProposalsBloc>().add(
+                            ProposalLineRemoved(index),
+                          );
+                        }),
                   icon: const Icon(Icons.close, size: 18),
                 ),
             ],
@@ -1404,11 +1576,11 @@ class _ProposalFormViewState extends State<_ProposalFormView> {
                   child: Text(
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.highlight,
-                          height: 1.2,
-                        ),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.highlight,
+                      height: 1.2,
+                    ),
                   ),
                 ),
                 ?trailing,

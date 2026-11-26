@@ -23,6 +23,7 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../injection_container.dart';
 import '../../../settings/domain/entities/client.dart';
 import '../../../settings/presentation/bloc/clients/clients_bloc.dart';
+import '../../../settings/presentation/widgets/client_name_label.dart';
 import '../../data/datasources/expense_remote_datasource.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/usecases/expense_category_usecases.dart';
@@ -280,6 +281,14 @@ class _ExpenseListState extends State<_ExpenseList> {
                     ),
                   ),
                 )
+              : isDesktop
+              ? _ExpenseTable(
+                  expenses: expenses,
+                  isStaff: isStaff,
+                  busy: busy,
+                  approvingId: widget.state.approvingId,
+                  dateFormat: dateFormat,
+                )
               : ListView.separated(
                   padding: EdgeInsets.fromLTRB(
                     isDesktop ? 32 : 16,
@@ -298,7 +307,8 @@ class _ExpenseListState extends State<_ExpenseList> {
                     // Staff may correct an approved/paid expense; the edit
                     // automatically returns it to pending for re-approval.
                     // An employee may still edit only their own pending claim.
-                    final canEdit = isStaff ||
+                    final canEdit =
+                        isStaff ||
                         expense.approvalStatus == ExpenseApprovalStatus.pending;
                     return AppListCard(
                       child: Row(
@@ -355,14 +365,15 @@ class _ExpenseListState extends State<_ExpenseList> {
                                       onPressed: busy
                                           ? null
                                           : () => _openExpenseReceipt(
-                                                context,
-                                                expense,
-                                              ),
+                                              context,
+                                              expense,
+                                            ),
                                       icon: Icons.attach_file,
                                     ),
                                   if (canEdit)
                                     AppListIconButton(
-                                      tooltip: expense.approvalStatus ==
+                                      tooltip:
+                                          expense.approvalStatus ==
                                               ExpenseApprovalStatus.pending
                                           ? 'Edit expense'
                                           : 'Edit and resubmit for approval',
@@ -450,37 +461,36 @@ class _ExpenseListState extends State<_ExpenseList> {
                                       ),
                                     ],
                                   ),
-                              if (isStaff &&
-                                  expense.approvalStatus ==
-                                      ExpenseApprovalStatus.approved) ...[
-                                const SizedBox(height: 8),
-                                TextButton(
-                                  onPressed: busy
-                                      ? null
-                                      : () => context
-                                            .read<ExpensesBloc>()
-                                            .add(
-                                              ExpenseApprovalChanged(
-                                                expenseId: expense.id,
-                                                status: ExpenseApprovalStatus
-                                                    .paid,
+                                if (isStaff &&
+                                    expense.approvalStatus ==
+                                        ExpenseApprovalStatus.approved) ...[
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: busy
+                                        ? null
+                                        : () =>
+                                              context.read<ExpensesBloc>().add(
+                                                ExpenseApprovalChanged(
+                                                  expenseId: expense.id,
+                                                  status: ExpenseApprovalStatus
+                                                      .paid,
+                                                ),
                                               ),
-                                            ),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: AppColors.success,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.success,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
+                                    child: const Text(
+                                      'Mark paid',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
                                   ),
-                                  child: const Text(
-                                    'Mark paid',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                              ],
+                                ],
                               ],
                             ],
                           ),
@@ -494,6 +504,172 @@ class _ExpenseListState extends State<_ExpenseList> {
       ],
     );
   }
+}
+
+class _ExpenseTable extends StatelessWidget {
+  const _ExpenseTable({
+    required this.expenses,
+    required this.isStaff,
+    required this.busy,
+    required this.approvingId,
+    required this.dateFormat,
+  });
+
+  final List<Expense> expenses;
+  final bool isStaff;
+  final bool busy;
+  final String? approvingId;
+  final DateFormat dateFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 12, 32, 32),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: MediaQuery.sizeOf(context).width - 248 - 64,
+            ),
+            child: DataTable(
+              showCheckboxColumn: false,
+              headingRowHeight: 48,
+              dataRowMinHeight: 56,
+              dataRowMaxHeight: 64,
+              horizontalMargin: 20,
+              columnSpacing: 28,
+              dividerThickness: .6,
+              headingTextStyle: textTheme.labelLarge?.copyWith(
+                color: AppColors.textLight,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: .5,
+              ),
+              dataTextStyle: textTheme.bodyLarge?.copyWith(fontSize: 13),
+              columns: const [
+                DataColumn(label: Text('DATE')),
+                DataColumn(label: Text('MADE FOR')),
+                DataColumn(label: Text('CLIENT / COST CENTER')),
+                DataColumn(label: Text('CATEGORY')),
+                DataColumn(label: Text('AMOUNT')),
+                DataColumn(label: Text('STATUS')),
+                DataColumn(label: Text('ACTIONS')),
+              ],
+              rows: expenses.map((expense) {
+                final canEdit =
+                    isStaff ||
+                    expense.approvalStatus == ExpenseApprovalStatus.pending;
+                return DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        expense.reportingDate == null
+                            ? '—'
+                            : dateFormat.format(
+                                expense.reportingDate!.toLocal(),
+                              ),
+                      ),
+                    ),
+                    DataCell(Text(expense.madeFor)),
+                    DataCell(
+                      expense.isCompanyExpense
+                          ? Text(expense.costCenterLabel)
+                          : ClientNameLabel(
+                              name: expense.costCenterLabel,
+                              logoRadius: 7,
+                              style: textTheme.bodyLarge?.copyWith(
+                                fontSize: 13,
+                              ),
+                            ),
+                    ),
+                    DataCell(Text(expense.category)),
+                    DataCell(Text(MoneyFormat.format(expense.amount))),
+                    DataCell(_ApprovalBadge(status: expense.approvalStatus)),
+                    DataCell(
+                      _ExpenseTableActions(
+                        expense: expense,
+                        canEdit: canEdit,
+                        isStaff: isStaff,
+                        busy: busy || approvingId == expense.id,
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpenseTableActions extends StatelessWidget {
+  const _ExpenseTableActions({
+    required this.expense,
+    required this.canEdit,
+    required this.isStaff,
+    required this.busy,
+  });
+
+  final Expense expense;
+  final bool canEdit;
+  final bool isStaff;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+    tooltip: 'Actions',
+    enabled: !busy,
+    onSelected: (value) {
+      switch (value) {
+        case 'receipt':
+          _openExpenseReceipt(context, expense);
+        case 'edit':
+          context.read<ExpensesBloc>().add(ExpenseEditOpened(expense));
+        case 'approve':
+          context.read<ExpensesBloc>().add(
+            ExpenseApprovalChanged(
+              expenseId: expense.id,
+              status: ExpenseApprovalStatus.approved,
+            ),
+          );
+        case 'reject':
+          context.read<ExpensesBloc>().add(
+            ExpenseApprovalChanged(
+              expenseId: expense.id,
+              status: ExpenseApprovalStatus.rejected,
+            ),
+          );
+        case 'paid':
+          context.read<ExpensesBloc>().add(
+            ExpenseApprovalChanged(
+              expenseId: expense.id,
+              status: ExpenseApprovalStatus.paid,
+            ),
+          );
+      }
+    },
+    itemBuilder: (_) => [
+      if ((expense.receiptPath ?? '').trim().isNotEmpty)
+        const PopupMenuItem(value: 'receipt', child: Text('Open receipt')),
+      if (canEdit) const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (isStaff &&
+          expense.approvalStatus == ExpenseApprovalStatus.pending) ...[
+        const PopupMenuItem(value: 'approve', child: Text('Approve')),
+        const PopupMenuItem(value: 'reject', child: Text('Reject')),
+      ],
+      if (isStaff && expense.approvalStatus == ExpenseApprovalStatus.approved)
+        const PopupMenuItem(value: 'paid', child: Text('Mark paid')),
+    ],
+  );
 }
 
 class _ApprovalBadge extends StatelessWidget {
